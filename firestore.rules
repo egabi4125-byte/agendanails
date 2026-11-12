@@ -1,0 +1,317 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdminEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true && request.auth.token.email == 'egabi4125@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isAdminEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Helpers (Blueprint Synchronicity) ---
+    function isValidClient(data) {
+      return data.keys().hasAll(['uid', 'name', 'phone', 'email', 'wallpaper', 'wallpaperOpacity', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'name', 'phone', 'email', 'wallpaper', 'wallpaperOpacity', 'notes', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() >= 8 && data.phone.size() <= 25
+        && data.email is string && data.email.size() <= 120
+        && data.wallpaper is string && data.wallpaper.size() >= 1 && data.wallpaper.size() <= 60
+        && data.wallpaperOpacity is number && data.wallpaperOpacity >= 0.05 && data.wallpaperOpacity <= 1.0
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500));
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll([
+          'clientId', 'clientName', 'clientPhone', 'clientEmail',
+          'serviceId', 'serviceName', 'servicePrice', 'date', 'time', 'slotId',
+          'status', 'paymentMethod', 'paymentTimingNote', 'paymentStatus',
+          'cancellationType', 'cancellationFee', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'clientId', 'clientName', 'clientPhone', 'clientEmail',
+          'serviceId', 'serviceName', 'servicePrice', 'date', 'time', 'slotId',
+          'status', 'paymentMethod', 'paymentTimingNote', 'paymentStatus',
+          'cancellationType', 'cancellationFee', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.clientId)
+        && data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 100
+        && data.clientPhone is string && data.clientPhone.size() >= 8 && data.clientPhone.size() <= 25
+        && data.clientEmail is string && data.clientEmail.size() <= 120
+        && data.serviceId is string && data.serviceId.size() >= 1 && data.serviceId.size() <= 64
+        && data.serviceName is string && data.serviceName.size() >= 2 && data.serviceName.size() <= 100
+        && data.servicePrice is number && data.servicePrice >= 0 && data.servicePrice <= 50000
+        && data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.time is string && data.time.size() == 5 && data.time.matches('^[0-9]{2}:[0-9]{2}$')
+        && data.slotId is string && data.slotId.size() == 16 && data.slotId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}$')
+        && data.status in ['confirmed', 'completed', 'cancelled']
+        && data.paymentMethod in ['Pix', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro']
+        && data.paymentTimingNote is string && data.paymentTimingNote.size() <= 160
+        && data.paymentStatus in ['pending', 'paid', 'fee_pending']
+        && data.cancellationType in ['none', 'free', 'late_fee']
+        && data.cancellationFee is number && data.cancellationFee >= 0 && data.cancellationFee <= 5000
+        && data.notes is string && data.notes.size() <= 500;
+    }
+
+    function isValidSlot(data) {
+      return data.keys().hasAll(['date', 'time', 'status', 'bookedByUid', 'appointmentId', 'createdAt'])
+        && data.keys().hasOnly(['date', 'time', 'status', 'bookedByUid', 'appointmentId', 'createdAt'])
+        && data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.time is string && data.time.size() == 5 && data.time.matches('^[0-9]{2}:[0-9]{2}$')
+        && data.status == 'booked'
+        && isValidId(data.bookedByUid)
+        && isValidId(data.appointmentId);
+    }
+
+    function isValidClientDayLock(data) {
+      return data.keys().hasAll(['clientId', 'date', 'appointmentId', 'createdAt'])
+        && data.keys().hasOnly(['clientId', 'date', 'appointmentId', 'createdAt'])
+        && isValidId(data.clientId)
+        && data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && isValidId(data.appointmentId);
+    }
+
+    function isValidClosure(data) {
+      return data.keys().hasAll(['type', 'date', 'endDate', 'time', 'reason', 'createdBy', 'createdAt'])
+        && data.keys().hasOnly(['type', 'date', 'endDate', 'time', 'reason', 'createdBy', 'createdAt'])
+        && data.type in ['day', 'week', 'slot']
+        && data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.endDate is string && data.endDate.size() == 10 && data.endDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.time is string && data.time.size() <= 5
+        && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 200
+        && isValidId(data.createdBy);
+    }
+
+    function isValidFinanceEntry(data) {
+      return data.keys().hasAll(['date', 'amount', 'paymentMethod', 'description', 'clientName', 'appointmentId', 'type', 'createdBy', 'createdAt'])
+        && data.keys().hasOnly(['date', 'amount', 'paymentMethod', 'description', 'clientName', 'appointmentId', 'type', 'createdBy', 'createdAt'])
+        && data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.amount is number && data.amount > 0 && data.amount <= 100000
+        && data.paymentMethod in ['Pix', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro']
+        && data.description is string && data.description.size() >= 2 && data.description.size() <= 200
+        && data.clientName is string && data.clientName.size() <= 100
+        && data.appointmentId is string && data.appointmentId.size() <= 128
+        && data.type in ['income', 'fee']
+        && isValidId(data.createdBy);
+    }
+
+    function isValidStudioConfig(data) {
+      return data.keys().hasAll([
+          'studioName', 'address', 'referencePoint', 'mapsUrl',
+          'ownerPhone', 'ownerEmail', 'lateCancellationFee',
+          'workingHours', 'services', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'studioName', 'address', 'referencePoint', 'mapsUrl',
+          'ownerPhone', 'ownerEmail', 'lateCancellationFee',
+          'pixKey', 'pixBeneficiaryName', 'pixCity',
+          'workingHours', 'services', 'updatedAt'
+        ])
+        && data.studioName is string && data.studioName.size() >= 2 && data.studioName.size() <= 100
+        && data.address is string && data.address.size() <= 300
+        && data.referencePoint is string && data.referencePoint.size() <= 200
+        && data.mapsUrl is string && data.mapsUrl.size() <= 500
+        && data.ownerPhone is string && data.ownerPhone.size() <= 25
+        && data.ownerEmail is string && data.ownerEmail.size() <= 120
+        && data.lateCancellationFee is number && data.lateCancellationFee >= 0 && data.lateCancellationFee <= 2000
+        && (!('pixKey' in data) || (data.pixKey is string && data.pixKey.size() <= 140))
+        && (!('pixBeneficiaryName' in data) || (data.pixBeneficiaryName is string && data.pixBeneficiaryName.size() <= 60))
+        && (!('pixCity' in data) || (data.pixCity is string && data.pixCity.size() <= 40))
+        && data.workingHours is list && data.workingHours.size() > 0 && data.workingHours.size() <= 24 && data.workingHours[0] is string
+        && data.services is list && data.services.size() > 0 && data.services.size() <= 30 && data.services[0] is map;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['role', 'username', 'passkey', 'createdAt'])
+        && data.keys().hasOnly(['role', 'username', 'passkey', 'createdAt'])
+        && data.role == 'owner'
+        && data.username is string && data.username.size() >= 2 && data.username.size() <= 60
+        && data.passkey is string && data.passkey.size() >= 1 && data.passkey.size() <= 64;
+    }
+
+    // --- Collection Rules ---
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isOwner(adminId);
+      allow list: if false;
+      allow create: if isValidId(adminId)
+        && isOwner(adminId)
+        && isValidAdminRecord(incoming())
+        && incoming().createdAt == request.time
+        && (
+          isAdminEmail() ||
+          (incoming().username == 'AnneCaroline' && incoming().passkey == 'carol1234')
+        );
+      allow update, delete: if false;
+    }
+
+    match /clients/{clientId} {
+      allow get: if isValidId(clientId) && (isOwner(clientId) || isAdmin());
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isValidId(clientId)
+        && isSignedIn()
+        && isValidClient(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isOwner(clientId) && incoming().uid == request.auth.uid) ||
+          isAdmin()
+        );
+      allow update: if isSignedIn()
+        && isValidId(clientId)
+        && isValidClient(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            isOwner(clientId) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'email', 'wallpaper', 'wallpaperOpacity', 'notes', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(clientId) && isAdmin();
+    }
+
+    match /slots/{slotId} {
+      allow get: if isValidId(slotId) && isSignedIn();
+      allow list: if isSignedIn() && resource.data.status == 'booked';
+      allow create: if isValidId(slotId)
+        && isSignedIn()
+        && isValidSlot(incoming())
+        && incoming().createdAt == request.time
+        && slotId.matches('^' + incoming().date + '_[0-9]{2}-[0-9]{2}$')
+        && (isAdmin() || (incoming().bookedByUid == request.auth.uid && existsAfter(/databases/$(database)/documents/appointments/$(incoming().appointmentId))));
+      allow update: if isValidId(slotId) && isAdmin() && isValidSlot(incoming());
+      allow delete: if isValidId(slotId) && (isAdmin() || (isSignedIn() && existing().bookedByUid == request.auth.uid));
+    }
+
+    match /clientDayLocks/{lockId} {
+      allow get: if isValidId(lockId) && (isAdmin() || (isSignedIn() && lockId.matches('^' + request.auth.uid + '_[0-9]{4}-[0-9]{2}-[0-9]{2}$')));
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isValidId(lockId)
+        && isSignedIn()
+        && isValidClientDayLock(incoming())
+        && incoming().createdAt == request.time
+        && (isAdmin() || (incoming().clientId == request.auth.uid && lockId == (request.auth.uid + '_' + incoming().date)));
+      allow update: if false;
+      allow delete: if isValidId(lockId) && (isAdmin() || (isSignedIn() && existing().clientId == request.auth.uid));
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && (isAdmin() || (isSignedIn() && existing().clientId == request.auth.uid));
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isValidId(appointmentId)
+        && isSignedIn()
+        && isValidAppointment(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            incoming().clientId == request.auth.uid
+            && incoming().status == 'confirmed'
+            && incoming().paymentStatus == 'pending'
+            && incoming().cancellationType == 'none'
+            && incoming().cancellationFee == 0
+            && !exists(/databases/$(database)/documents/closures/$(('day_' + incoming().date)))
+            && !exists(/databases/$(database)/documents/closures/$(('slot_' + incoming().slotId)))
+            && existsAfter(/databases/$(database)/documents/slots/$(incoming().slotId))
+            && existsAfter(/databases/$(database)/documents/clientDayLocks/$(incoming().clientId + '_' + incoming().date))
+          )
+        );
+      allow update: if isSignedIn()
+        && isValidId(appointmentId)
+        && isValidAppointment(incoming())
+        && incoming().clientId == existing().clientId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().clientId == request.auth.uid
+            && existing().status == 'confirmed'
+            && incoming().status == 'cancelled'
+            && incoming().cancellationType in ['free', 'late_fee']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'cancellationType', 'cancellationFee', 'paymentStatus', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(appointmentId) && isAdmin();
+    }
+
+    match /closures/{closureId} {
+      allow get: if isValidId(closureId) && isSignedIn();
+      allow list: if isSignedIn() && resource.data.type in ['day', 'week', 'slot'];
+      allow create: if isValidId(closureId)
+        && isAdmin()
+        && isValidClosure(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(closureId)
+        && isValidClosure(incoming())
+        && isAdmin()
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(closureId) && isAdmin();
+    }
+
+    match /finances/{financeId} {
+      allow get: if isValidId(financeId) && isAdmin();
+      allow list: if isAdmin() && resource.data.type in ['income', 'fee'];
+      allow create: if isValidId(financeId)
+        && isAdmin()
+        && isValidFinanceEntry(incoming())
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(financeId)
+        && isValidFinanceEntry(incoming())
+        && isAdmin()
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(financeId) && isAdmin();
+    }
+
+    match /studio/{configId} {
+      allow get: if isValidId(configId) && isSignedIn();
+      allow list: if false;
+      allow create, update: if isSignedIn()
+        && isValidId(configId)
+        && isValidStudioConfig(incoming())
+        && isAdmin()
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

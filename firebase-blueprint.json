@@ -1,0 +1,472 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "Cadastro e preferências da cliente do estúdio",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 25
+        },
+        "email": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "wallpaper": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "wallpaperOpacity": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "name", "phone", "email", "wallpaper", "wallpaperOpacity", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamento de horário de atendimento no estúdio",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "clientPhone": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 25
+        },
+        "clientEmail": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "serviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "serviceName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "servicePrice": {
+          "type": "number"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "time": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^[0-9]{2}:[0-9]{2}$"
+        },
+        "slotId": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 16,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["confirmed", "completed", "cancelled"]
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"]
+        },
+        "paymentTimingNote": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["pending", "paid", "fee_pending"]
+        },
+        "cancellationType": {
+          "type": "string",
+          "enum": ["none", "free", "late_fee"]
+        },
+        "cancellationFee": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "clientId",
+        "clientName",
+        "clientPhone",
+        "clientEmail",
+        "serviceId",
+        "serviceName",
+        "servicePrice",
+        "date",
+        "time",
+        "slotId",
+        "status",
+        "paymentMethod",
+        "paymentTimingNote",
+        "paymentStatus",
+        "cancellationType",
+        "cancellationFee",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Slot": {
+      "title": "Slot",
+      "description": "Projeção pública sem PII para indicar horários ocupados no calendário",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "time": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 5,
+          "pattern": "^[0-9]{2}:[0-9]{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["booked"]
+        },
+        "bookedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "appointmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["date", "time", "status", "bookedByUid", "appointmentId", "createdAt"]
+    },
+    "ClientDayLock": {
+      "title": "ClientDayLock",
+      "description": "Trava atômica impedindo que a mesma cliente agende mais de 1 horário no mesmo dia",
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "appointmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["clientId", "date", "appointmentId", "createdAt"]
+    },
+    "Closure": {
+      "title": "Closure",
+      "description": "Bloqueios de agenda por dia, semana ou horário específico definidos pela proprietária",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["day", "week", "slot"]
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "endDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "time": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 5
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["type", "date", "endDate", "time", "reason", "createdBy", "createdAt"]
+    },
+    "FinanceEntry": {
+      "title": "FinanceEntry",
+      "description": "Lançamentos financeiros de valores recebidos no estúdio",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["Pix", "Cartão de Crédito", "Cartão de Débito", "Dinheiro"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100
+        },
+        "appointmentId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "type": {
+          "type": "string",
+          "enum": ["income", "fee"]
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["date", "amount", "paymentMethod", "description", "clientName", "appointmentId", "type", "createdBy", "createdAt"]
+    },
+    "StudioConfig": {
+      "title": "StudioConfig",
+      "description": "Configurações públicas do estúdio, localização, serviços e horários",
+      "type": "object",
+      "properties": {
+        "studioName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "address": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "referencePoint": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "mapsUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "ownerPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 25
+        },
+        "ownerEmail": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "lateCancellationFee": {
+          "type": "number"
+        },
+        "pixKey": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 140
+        },
+        "pixBeneficiaryName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 60
+        },
+        "pixCity": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "workingHours": {
+          "type": "array"
+        },
+        "services": {
+          "type": "array"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "studioName",
+        "address",
+        "referencePoint",
+        "mapsUrl",
+        "ownerPhone",
+        "ownerEmail",
+        "lateCancellationFee",
+        "workingHours",
+        "services",
+        "updatedAt"
+      ]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Registro de acesso administrativo da proprietária",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["owner"]
+        },
+        "username": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 60
+        },
+        "passkey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["role", "username", "passkey", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Perfis de clientes com PII e papel de parede personalizado privado"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Agendamentos detalhados com proteção de privacidade e regras de cancelamento"
+    },
+    "/slots/{slotId}": {
+      "schema": { "$ref": "#/entities/Slot" },
+      "description": "Slots ocupados sem dados pessoais para exibição do calendário"
+    },
+    "/clientDayLocks/{lockId}": {
+      "schema": { "$ref": "#/entities/ClientDayLock" },
+      "description": "Trava única por cliente e data impedindo mais de 1 agendamento no mesmo dia"
+    },
+    "/closures/{closureId}": {
+      "schema": { "$ref": "#/entities/Closure" },
+      "description": "Bloqueios de agenda por dia, semana ou horário"
+    },
+    "/finances/{financeId}": {
+      "schema": { "$ref": "#/entities/FinanceEntry" },
+      "description": "Relatório financeiro restrito à proprietária"
+    },
+    "/studio/{configId}": {
+      "schema": { "$ref": "#/entities/StudioConfig" },
+      "description": "Localização do salão, serviços e horários padrão"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Registros de autorização administrativa da proprietária"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Atelier Anne Caroline — Agenda Nail Designer",
+  "description": "Sistema de agendamento online para clientes e gestão completa do estúdio Anne Caroline Nail Designer com calendário em tempo real, personalização de papel de parede, localização e controle financeiro.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
