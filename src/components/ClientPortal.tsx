@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   collection,
@@ -110,7 +110,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [confirmedReceipt, setConfirmedReceipt] = useState<Appointment | null>(null);
-  const autoWhatsappRef = useRef<HTMLAnchorElement | null>(null);
+  const [confirmationModalAppt, setConfirmationModalAppt] = useState<Appointment | null>(null);
 
   const buildBookingConfirmationWhatsAppUrl = (appt: Appointment): string => {
     const msg = [
@@ -126,14 +126,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       .filter(Boolean)
       .join('\n');
     return buildWhatsAppUrl(studioConfig.ownerPhone, msg);
-  };
-
-  const openSingleWhatsAppTab = (url: string) => {
-    const anchor = autoWhatsappRef.current;
-    if (!anchor) return;
-    anchor.href = url;
-    anchor.target = WHATSAPP_TAB_TARGET;
-    anchor.click();
   };
 
   // Cancel / Reschedule Modal State
@@ -330,11 +322,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         );
         await onServerRefresh?.();
         setConfirmedReceipt(res.appointment);
+        setConfirmationModalAppt(res.appointment);
         setSelectedTime(null);
         setNotes('');
-        openSingleWhatsAppTab(
-          buildBookingConfirmationWhatsAppUrl(res.appointment)
-        );
       } catch (err) {
         setBookingError(
           err instanceof Error
@@ -388,11 +378,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         id: apptRef.id,
       };
       setConfirmedReceipt(confirmedAppt);
+      setConfirmationModalAppt(confirmedAppt);
       setSelectedTime(null);
       setNotes('');
-      openSingleWhatsAppTab(
-        buildBookingConfirmationWhatsAppUrl(confirmedAppt)
-      );
     } catch (err) {
       try {
         handleFirestoreError(err, OperationType.WRITE, `appointments/${apptRef.id}`);
@@ -568,18 +556,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   return (
     <div className="min-h-screen relative text-[#16141C] flex flex-col bg-[#FAFAFA]">
-      {/* Hidden anchor to auto-trigger WhatsApp in a single reused tab without window.open */}
-      <a
-        ref={autoWhatsappRef}
-        href="https://wa.me/"
-        target={WHATSAPP_TAB_TARGET}
-        tabIndex={-1}
-        aria-hidden="true"
-        className="sr-only"
-      >
-        WhatsApp
-      </a>
-
       {/* Client-Only Personalized Wallpaper Backdrop */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         {activeWallpaper.imageUrl && !wallpaperImgErrors[activeWallpaper.id] ? (
@@ -732,7 +708,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         Horário confirmado automaticamente
                       </h2>
                       <p className="text-sm text-[#5E5B66] mt-0.5">
-                        Sua reserva foi salva no sistema e o WhatsApp foi acionado com a mensagem de confirmação. Caso o navegador bloqueie a abertura automática, use o botão abaixo.
+                        Sua reserva foi salva no sistema. Use o botão abaixo para enviar sua confirmação por WhatsApp ou e-mail.
                       </p>
                     </div>
                   </div>
@@ -1766,6 +1742,124 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 className="px-4 py-2 text-xs font-medium text-[#5E5B66] hover:text-[#16141C]"
               >
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Confirmation Notification Modal */}
+      {confirmationModalAppt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="booking-confirmed-title"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white border border-[#E4E2E8] rounded-2xl max-w-md w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700">
+                    Notificação de Agendamento
+                  </p>
+                  <h3
+                    id="booking-confirmed-title"
+                    className="font-display text-2xl font-semibold text-[#16141C] mt-0.5"
+                  >
+                    Horário confirmado!
+                  </h3>
+                  <p className="text-xs text-[#5E5B66] mt-0.5">
+                    Sua reserva foi registrada no sistema com sucesso.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmationModalAppt(null)}
+                aria-label="Fechar notificação"
+                className="p-1.5 text-[#5E5B66] hover:text-[#16141C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E2E8] space-y-2.5 text-xs">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#5E5B66]">Data e horário</span>
+                <span className="font-semibold font-mono tabular-nums text-[#16141C]">
+                  {formatShortDatePtBr(confirmationModalAppt.date)} · {confirmationModalAppt.time}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#5E5B66]">Serviço</span>
+                <span className="font-semibold text-[#16141C] text-right">
+                  {confirmationModalAppt.serviceName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#5E5B66]">Pagamento</span>
+                <span className="font-semibold text-[#16141C] text-right">
+                  {confirmationModalAppt.paymentMethod} ({formatCurrencyBRL(confirmationModalAppt.servicePrice)})
+                </span>
+              </div>
+              <div className="pt-2 border-t border-[#E4E2E8] space-y-1">
+                <p className="text-[#5E5B66]">
+                  <span className="font-semibold text-[#16141C]">Local:</span>{' '}
+                  {studioConfig.address}
+                </p>
+                <p className="text-[#5E5B66]">
+                  Pagamento presencial após o atendimento. Cancelamento gratuito até 2h antes.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <a
+                href={buildBookingConfirmationWhatsAppUrl(confirmationModalAppt)}
+                target={WHATSAPP_TAB_TARGET}
+                onClick={() => setConfirmationModalAppt(null)}
+                className="w-full py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Enviar confirmação por WhatsApp</span>
+              </a>
+
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={buildMailtoUrl(
+                    confirmationModalAppt.clientEmail,
+                    `Confirmação de Horário — ${studioConfig.studioName}`,
+                    `Olá ${confirmationModalAppt.clientName},\n\nSeu horário está confirmado!\nData: ${formatShortDatePtBr(confirmationModalAppt.date)} às ${confirmationModalAppt.time}\nServiço: ${confirmationModalAppt.serviceName} (${formatCurrencyBRL(confirmationModalAppt.servicePrice)})\nPagamento (${confirmationModalAppt.paymentMethod}) será realizado após o atendimento.\nLocal: ${studioConfig.address}\n\nPolítica: Cancelamento gratuito até 2 horas antes do horário.`
+                  )}
+                  className="py-2.5 px-3 border border-[#E4E2E8] hover:bg-[#F3F2F5] text-[#16141C] text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Enviar por E-mail</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmationModalAppt(null);
+                    setActiveTab('my_bookings');
+                  }}
+                  className="py-2.5 px-3 border border-[#E4E2E8] hover:bg-[#F3F2F5] text-[#16141C] text-xs font-semibold rounded-xl transition-colors"
+                >
+                  Ver Meus Horários
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmationModalAppt(null)}
+                className="text-xs font-medium text-[#5E5B66] hover:text-[#16141C]"
+              >
+                Fechar notificação
               </button>
             </div>
           </div>
