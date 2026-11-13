@@ -1,3 +1,6 @@
+import anneAvatarImg from './assets/images/anne_caroline_avatar_1794522577752.jpg';
+import studioHeroImg from './assets/images/studio_hero_nails_1794522576080.jpg';
+
 export type PaymentMethod = 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito' | 'Dinheiro';
 
 export type AppointmentStatus = 'confirmed' | 'completed' | 'cancelled';
@@ -179,6 +182,6 @@ export const WALLPAPER_OPTIONS: WallpaperOption[] = [
 ];
 
 export const STUDIO_IMAGES = {
-  hero: '/src/assets/images/studio_hero_nails_1794522576080.jpg',
-  ownerAvatar: '/src/assets/images/anne_caroline_avatar_1794522577752.jpg',
+  hero: studioHeroImg,
+  ownerAvatar: anneAvatarImg,
 };

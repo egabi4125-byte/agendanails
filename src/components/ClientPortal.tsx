@@ -349,12 +349,26 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         appointmentId: apptRef.id,
         createdAt: serverTimestamp(),
       });
-      batch.update(clientRef, {
-        name: fullName.trim().slice(0, 100),
-        phone: phone.trim().slice(0, 25),
-        email: email.trim().slice(0, 120),
-        updatedAt: serverTimestamp(),
-      });
+      if (clientProfile) {
+        batch.update(clientRef, {
+          name: fullName.trim().slice(0, 100),
+          phone: phone.trim().slice(0, 25),
+          email: email.trim().slice(0, 120),
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        batch.set(clientRef, {
+          uid,
+          name: fullName.trim().slice(0, 100),
+          phone: phone.trim().slice(0, 25),
+          email: email.trim().slice(0, 120),
+          wallpaper: 'default',
+          wallpaperOpacity: 0.28,
+          notes: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
       await batch.commit();
 
       const confirmedAppt: Appointment = {

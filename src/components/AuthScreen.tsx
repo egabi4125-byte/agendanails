@@ -7,7 +7,7 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import {
   ArrowLeft,
   ArrowRight,
@@ -105,7 +105,8 @@ export const AuthScreen: React.FC = () => {
     uid: string,
     name: string,
     phone: string,
-    email: string
+    email: string,
+    overwriteContact = false
   ) => {
     const clientRef = doc(db, 'clients', uid);
     try {
@@ -120,6 +121,13 @@ export const AuthScreen: React.FC = () => {
           wallpaperOpacity: 0.28,
           notes: '',
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } else if (overwriteContact) {
+        await updateDoc(clientRef, {
+          name: name.trim().slice(0, 100) || 'Cliente',
+          phone: phone.trim().slice(0, 25) || '(00) 00000-0000',
+          email: email.trim().slice(0, 120),
           updatedAt: serverTimestamp(),
         });
       }
@@ -202,6 +210,7 @@ export const AuthScreen: React.FC = () => {
     setLoading(true);
     try {
       sessionStorage.setItem('atelier_login_mode', 'client');
+      sessionStorage.setItem('atelier_registering', '1');
       try {
         const cred = await createUserWithEmailAndPassword(
           auth,
@@ -213,7 +222,8 @@ export const AuthScreen: React.FC = () => {
           cred.user.uid,
           regName.trim(),
           regPhone.trim(),
-          regEmail.trim()
+          regEmail.trim(),
+          true
         );
         try {
           await sendEmailVerification(cred.user);
@@ -242,6 +252,7 @@ export const AuthScreen: React.FC = () => {
     } catch (err) {
       setErrorMsg(mapAuthError(err));
     } finally {
+      sessionStorage.removeItem('atelier_registering');
       setLoading(false);
     }
   };
@@ -345,12 +356,19 @@ export const AuthScreen: React.FC = () => {
         const adminRef = doc(db, 'admins', userCred.user.uid);
         const snap = await getDoc(adminRef);
         if (!snap.exists()) {
-          await setDoc(adminRef, {
-            role: 'owner',
-            username: 'AnneCaroline',
-            passkey: 'carol20',
-            createdAt: serverTimestamp(),
-          });
+          try {
+            await setDoc(adminRef, {
+              role: 'owner',
+              username: 'AnneCaroline',
+              passkey: 'carol20',
+              createdAt: serverTimestamp(),
+            });
+          } catch (adminErr) {
+            const recheck = await getDoc(adminRef).catch(() => null);
+            if (!recheck?.exists()) {
+              throw adminErr;
+            }
+          }
         }
       } catch (fbErr) {
         if (isProviderDisabledError(fbErr)) {

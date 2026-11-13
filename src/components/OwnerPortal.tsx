@@ -9,7 +9,6 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import {
-  Calendar as CalendarIcon,
   Check,
   CheckCircle2,
   Copy,
@@ -81,6 +80,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
   onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<OwnerTab>('agenda');
+  const [actionError, setActionError] = useState<string | null>(null);
   const todayKey = useMemo(() => toDateKey(new Date()), []);
 
   // Agenda Filters
@@ -465,11 +465,18 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
   };
 
   const handleCompleteAndPay = async (appt: Appointment) => {
+    setActionError(null);
     if (useServerFallback) {
-      await apiRequest(`/api/studio/bookings/${appt.id}/complete`, {
-        method: 'POST',
-      });
-      await onServerRefresh?.();
+      try {
+        await apiRequest(`/api/studio/bookings/${appt.id}/complete`, {
+          method: 'POST',
+        });
+        await onServerRefresh?.();
+      } catch (err) {
+        setActionError(
+          err instanceof Error ? err.message : 'Erro ao finalizar atendimento.'
+        );
+      }
       return;
     }
     try {
@@ -496,16 +503,28 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       });
       await batch.commit();
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `appointments/${appt.id}`);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível concluir o atendimento.'
+      );
+      console.error(err);
     }
   };
 
   const handleConfirmFeePaid = async (appt: Appointment) => {
+    setActionError(null);
     if (useServerFallback) {
-      await apiRequest(`/api/studio/bookings/${appt.id}/confirm-fee`, {
-        method: 'POST',
-      });
-      await onServerRefresh?.();
+      try {
+        await apiRequest(`/api/studio/bookings/${appt.id}/confirm-fee`, {
+          method: 'POST',
+        });
+        await onServerRefresh?.();
+      } catch (err) {
+        setActionError(
+          err instanceof Error ? err.message : 'Erro ao confirmar pagamento da taxa.'
+        );
+      }
       return;
     }
     try {
@@ -530,16 +549,28 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       }
       await batch.commit();
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `appointments/${appt.id}`);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível confirmar o pagamento da taxa.'
+      );
+      console.error(err);
     }
   };
 
   const handleDeleteAppointment = async (appt: Appointment) => {
+    setActionError(null);
     if (useServerFallback) {
-      await apiRequest(`/api/studio/bookings/${appt.id}`, {
-        method: 'DELETE',
-      });
-      await onServerRefresh?.();
+      try {
+        await apiRequest(`/api/studio/bookings/${appt.id}`, {
+          method: 'DELETE',
+        });
+        await onServerRefresh?.();
+      } catch (err) {
+        setActionError(
+          err instanceof Error ? err.message : 'Erro ao excluir agendamento.'
+        );
+      }
       return;
     }
     try {
@@ -549,7 +580,12 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       batch.delete(doc(db, 'clientDayLocks', `${appt.clientId}_${appt.date}`));
       await batch.commit();
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `appointments/${appt.id}`);
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível excluir o agendamento.'
+      );
+      console.error(err);
     }
   };
 
@@ -978,6 +1014,23 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {actionError && (
+          <div
+            role="alert"
+            className="p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-center justify-between gap-3"
+          >
+            <span className="font-medium break-words">{actionError}</span>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              aria-label="Fechar alerta"
+              className="p-1 text-red-700 hover:text-red-900 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Owner Header Strip + KPIs */}
         <div className="bg-white border border-[#E4E2E8] rounded-2xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-center gap-4">

@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode, useCallback, useEffect, useState } from 'react';
+import { Component, ErrorInfo, ReactNode, useCallback, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import {
   collection,
@@ -321,7 +321,7 @@ function AppContent() {
                 ...(snap.data() as ClientProfile),
                 uid: snap.id,
               });
-            } else {
+            } else if (sessionStorage.getItem('atelier_registering') !== '1') {
               // Ensure baseline profile exists if client signed in directly
               setDoc(doc(db, 'clients', firebaseUser.uid), {
                 uid: firebaseUser.uid,
