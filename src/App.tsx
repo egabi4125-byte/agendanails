@@ -87,6 +87,7 @@ function AppContent() {
   } | null>(() => getStoredFallbackSession());
   const [isOwner, setIsOwner] = useState(false);
   const [roleChecked, setRoleChecked] = useState(false);
+  const [minSplashDone, setMinSplashDone] = useState(false);
 
   const [studioConfig, setStudioConfig] = useState<StudioConfig>(DEFAULT_STUDIO_CONFIG);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
@@ -95,6 +96,11 @@ function AppContent() {
   const [slots, setSlots] = useState<SlotDoc[]>([]);
   const [closures, setClosures] = useState<ClosureDoc[]>([]);
   const [finances, setFinances] = useState<FinanceEntry[]>([]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMinSplashDone(true), 750);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     testFirestoreConnection();
@@ -388,14 +394,23 @@ function AppContent() {
     }
   };
 
-  if (!authReady || !roleChecked) {
+  if (!authReady || !roleChecked || !minSplashDone) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-6">
-        <div className="text-center space-y-2">
-          <p className="font-display text-2xl font-semibold text-[#16141C]">
-            Atelier Anne Caroline
-          </p>
-          <p className="text-xs text-[#5E5B66]">Carregando agenda...</p>
+        <div className="text-center space-y-4">
+          <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-[#E4E2E8] shadow-md bg-[#F28BB2]">
+            <img
+              src="/assets/aistudio/WhatsApp_Image_2026-11-13_at_08.55.39_5baf2dd3.jpeg"
+              alt="Logo byannenails"
+              className="w-full h-full object-cover scale-110"
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="font-display text-3xl font-semibold text-[#16141C] tracking-tight">
+              byannenails
+            </p>
+            <p className="text-xs text-[#5E5B66]">Entrando no site...</p>
+          </div>
         </div>
       </div>
     );

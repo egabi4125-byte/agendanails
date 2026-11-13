@@ -19,6 +19,7 @@ interface StudioConfig {
   ownerPhone: string;
   ownerEmail: string;
   instagramUrl?: string;
+  bookingFee?: number;
   lateCancellationFee: number;
   pixKey?: string;
   pixBeneficiaryName?: string;
@@ -116,13 +117,14 @@ interface StudioDatabase {
 }
 
 const DEFAULT_STUDIO_CONFIG: StudioConfig = {
-  studioName: 'Atelier Anne Caroline',
+  studioName: 'byannenails',
   address: 'Rua das Flores, 240 — Sala 04, Centro',
   referencePoint: 'Próximo à Praça Central, edifício com fachada de vidro',
   mapsUrl: 'https://maps.google.com/?q=Rua+das+Flores+240+Centro',
   ownerPhone: '5511999999999',
   ownerEmail: 'contato@atelierannecaroline.com',
   instagramUrl: 'https://instagram.com/atelierannecaroline',
+  bookingFee: 0,
   lateCancellationFee: 35,
   pixKey: '',
   pixBeneficiaryName: 'Anne Caroline',

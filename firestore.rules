@@ -133,7 +133,8 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'studioName', 'address', 'referencePoint', 'mapsUrl',
-          'ownerPhone', 'ownerEmail', 'instagramUrl', 'lateCancellationFee',
+          'ownerPhone', 'ownerEmail', 'instagramUrl',
+          'bookingFee', 'lateCancellationFee',
           'pixKey', 'pixBeneficiaryName', 'pixCity',
           'workingHours', 'services', 'updatedAt'
         ])
@@ -144,6 +145,7 @@ service cloud.firestore {
         && data.ownerPhone is string && data.ownerPhone.size() <= 25
         && data.ownerEmail is string && data.ownerEmail.size() <= 120
         && (!('instagramUrl' in data) || (data.instagramUrl is string && data.instagramUrl.size() <= 300))
+        && (!('bookingFee' in data) || (data.bookingFee is number && data.bookingFee >= 0 && data.bookingFee <= 2000))
         && data.lateCancellationFee is number && data.lateCancellationFee >= 0 && data.lateCancellationFee <= 2000
         && (!('pixKey' in data) || (data.pixKey is string && data.pixKey.size() <= 140))
         && (!('pixBeneficiaryName' in data) || (data.pixBeneficiaryName is string && data.pixBeneficiaryName.size() <= 60))

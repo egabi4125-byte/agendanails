@@ -371,6 +371,9 @@
           "minLength": 0,
           "maxLength": 300
         },
+        "bookingFee": {
+          "type": "number"
+        },
         "lateCancellationFee": {
           "type": "number"
         },

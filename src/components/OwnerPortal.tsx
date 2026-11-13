@@ -39,7 +39,6 @@ import {
   PAYMENT_METHODS,
   PaymentMethod,
   SlotDoc,
-  STUDIO_IMAGES,
   StudioConfig,
 } from '../types';
 import {
@@ -51,6 +50,8 @@ import {
   toDateKey,
   WHATSAPP_TAB_TARGET,
 } from '../utils/formatters';
+import { buildPixPayload } from '../utils/pix';
+import { PixQrDisplay } from './PixQrDisplay';
 
 type OwnerTab = 'agenda' | 'clients' | 'closures' | 'finance' | 'location';
 
@@ -144,16 +145,33 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
   const [cfgPhone, setCfgPhone] = useState(studioConfig.ownerPhone);
   const [cfgEmail, setCfgEmail] = useState(studioConfig.ownerEmail);
   const [cfgInstagram, setCfgInstagram] = useState(studioConfig.instagramUrl || '');
+  const [cfgBookingFee, setCfgBookingFee] = useState(String(studioConfig.bookingFee ?? 0));
   const [cfgLateFee, setCfgLateFee] = useState(String(studioConfig.lateCancellationFee));
   const [cfgPixKey, setCfgPixKey] = useState(studioConfig.pixKey || '');
   const [cfgPixBeneficiaryName, setCfgPixBeneficiaryName] = useState(
     studioConfig.pixBeneficiaryName || 'Anne Caroline'
   );
   const [cfgPixCity, setCfgPixCity] = useState(studioConfig.pixCity || 'SAO PAULO');
+  const [pixPreviewAmount, setPixPreviewAmount] = useState(
+    String(studioConfig.lateCancellationFee || studioConfig.bookingFee || 35)
+  );
   const [cfgHoursText, setCfgHoursText] = useState(studioConfig.workingHours.join(', '));
   const [cfgServices, setCfgServices] = useState<NailService[]>(studioConfig.services);
   const [cfgSaving, setCfgSaving] = useState(false);
   const [cfgSavedBanner, setCfgSavedBanner] = useState(false);
+
+  // Owner On-Screen Pix QR Modal State
+  const [ownerPixModal, setOwnerPixModal] = useState<{
+    title: string;
+    subtitle: string;
+    amount: number;
+    feeLabel: string;
+    txid: string;
+    clientName?: string;
+    clientPhone?: string;
+  } | null>(null);
+  const [quickPixKeyInput, setQuickPixKeyInput] = useState(studioConfig.pixKey || '');
+  const [savingQuickPixKey, setSavingQuickPixKey] = useState(false);
 
   React.useEffect(() => {
     setCfgName(studioConfig.studioName);
@@ -163,8 +181,10 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
     setCfgPhone(studioConfig.ownerPhone);
     setCfgEmail(studioConfig.ownerEmail);
     setCfgInstagram(studioConfig.instagramUrl || '');
+    setCfgBookingFee(String(studioConfig.bookingFee ?? 0));
     setCfgLateFee(String(studioConfig.lateCancellationFee));
     setCfgPixKey(studioConfig.pixKey || '');
+    setQuickPixKeyInput(studioConfig.pixKey || '');
     setCfgPixBeneficiaryName(studioConfig.pixBeneficiaryName || 'Anne Caroline');
     setCfgPixCity(studioConfig.pixCity || 'SAO PAULO');
     setCfgHoursText(studioConfig.workingHours.join(', '));
@@ -886,7 +906,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       parsedHours.length > 0 ? parsedHours : studioConfig.workingHours;
 
     const nextConfig = {
-      studioName: cfgName.trim().slice(0, 100) || 'Atelier Anne Caroline',
+      studioName: cfgName.trim().slice(0, 100) || 'byannenails',
       address: cfgAddress.trim().slice(0, 300),
       referencePoint: cfgRef.trim().slice(0, 200),
       mapsUrl:
@@ -895,6 +915,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       ownerPhone: cfgPhone.trim().slice(0, 25),
       ownerEmail: cfgEmail.trim().slice(0, 120),
       instagramUrl: cfgInstagram.trim().slice(0, 300),
+      bookingFee: Math.max(0, Number(cfgBookingFee) || 0),
       lateCancellationFee: Math.max(0, Number(cfgLateFee) || 0),
       pixKey: cfgPixKey.trim().slice(0, 140),
       pixBeneficiaryName: cfgPixBeneficiaryName.trim().slice(0, 60) || 'Anne Caroline',
@@ -930,6 +951,51 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
     }
   };
 
+  const handleSaveQuickPixKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = quickPixKeyInput.trim().slice(0, 140);
+    if (!cleaned) return;
+    setSavingQuickPixKey(true);
+    setActionError(null);
+    const nextConfig = {
+      studioName: studioConfig.studioName || 'byannenails',
+      address: studioConfig.address || '',
+      referencePoint: studioConfig.referencePoint || '',
+      mapsUrl: studioConfig.mapsUrl || '',
+      ownerPhone: studioConfig.ownerPhone || '',
+      ownerEmail: studioConfig.ownerEmail || '',
+      instagramUrl: studioConfig.instagramUrl || '',
+      bookingFee: Math.max(0, Number(studioConfig.bookingFee) || 0),
+      lateCancellationFee: Math.max(0, Number(studioConfig.lateCancellationFee) || 0),
+      pixKey: cleaned,
+      pixBeneficiaryName: studioConfig.pixBeneficiaryName || 'Anne Caroline',
+      pixCity: studioConfig.pixCity || 'SAO PAULO',
+      workingHours: studioConfig.workingHours,
+      services: studioConfig.services,
+    };
+    try {
+      if (useServerFallback) {
+        await apiRequest('/api/studio/config', {
+          method: 'PUT',
+          body: JSON.stringify(nextConfig),
+        });
+        await onServerRefresh?.();
+      } else {
+        await setDoc(doc(db, 'studio', 'config'), {
+          ...nextConfig,
+          updatedAt: serverTimestamp(),
+        });
+      }
+      setCfgPixKey(cleaned);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : 'Não foi possível salvar a chave Pix.'
+      );
+    } finally {
+      setSavingQuickPixKey(false);
+    }
+  };
+
   const handleAddServiceRow = () => {
     setCfgServices((prev) => [
       ...prev,
@@ -947,9 +1013,18 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
       {/* Top Navigation Bar (Strict 3-Zone Contract) */}
       <header className="sticky top-0 z-30 bg-white border-b border-[#E4E2E8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-6">
-          <span className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-[#16141C] whitespace-nowrap shrink-0">
-            {studioConfig.studioName}
-          </span>
+          <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-[#E4E2E8] shrink-0 bg-[#F28BB2]">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-11-13_at_08.55.39_5baf2dd3.jpeg"
+                alt="Logo byannenails"
+                className="w-full h-full object-cover scale-110"
+              />
+            </div>
+            <span className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-[#16141C]">
+              {studioConfig.studioName}
+            </span>
+          </div>
 
           <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-[#5E5B66]">
             {(
@@ -1034,12 +1109,13 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
         {/* Owner Header Strip + KPIs */}
         <div className="bg-white border border-[#E4E2E8] rounded-2xl p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <img
-              src={STUDIO_IMAGES.ownerAvatar}
-              alt="Anne Caroline"
-              referrerPolicy="no-referrer"
-              className="w-12 h-12 rounded-full object-cover border border-[#E4E2E8] shrink-0"
-            />
+            <div className="w-12 h-12 rounded-full overflow-hidden border border-[#E4E2E8] shrink-0 bg-[#F28BB2]">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-11-13_at_08.55.39_5baf2dd3.jpeg"
+                alt="Logo byannenails"
+                className="w-full h-full object-cover scale-110"
+              />
+            </div>
             <div>
               <p className="text-xs text-[#5E5B66]">
                 Painel da Proprietária · AnneCaroline
@@ -1227,15 +1303,70 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                       </button>
 
                       {appt.status === 'confirmed' && (
-                        <button
-                          type="button"
-                          onClick={() => handleCompleteAndPay(appt)}
-                          className="px-3 py-2 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Concluir e Receber</span>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const feeAmt =
+                                (studioConfig.bookingFee || 0) > 0
+                                  ? Number(studioConfig.bookingFee)
+                                  : appt.servicePrice;
+                              const isBookingFee = (studioConfig.bookingFee || 0) > 0;
+                              setOwnerPixModal({
+                                title: isBookingFee
+                                  ? 'Cobrança da Taxa de Reserva (Pix)'
+                                  : 'Cobrança via Pix',
+                                subtitle: `${appt.clientName} · ${formatShortDatePtBr(appt.date)} às ${appt.time} (${appt.serviceName})`,
+                                amount: feeAmt,
+                                feeLabel: isBookingFee ? 'Taxa de Reserva' : 'Valor do Atendimento',
+                                txid: `${isBookingFee ? 'SINAL' : 'ATEND'}${appt.date.replace(/-/g, '')}`,
+                                clientName: appt.clientName,
+                                clientPhone: appt.clientPhone,
+                              });
+                            }}
+                            className="px-3 py-2 border border-[#7A2E4D]/30 bg-[#FAF6F8] hover:bg-[#7A2E4D]/10 text-[#7A2E4D] text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>
+                              {(studioConfig.bookingFee || 0) > 0
+                                ? 'QR Code Taxa'
+                                : 'QR Code Pix'}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCompleteAndPay(appt)}
+                            className="px-3 py-2 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Concluir e Receber</span>
+                          </button>
+                        </>
                       )}
+
+                      {appt.status === 'cancelled' &&
+                        appt.cancellationType === 'late_fee' &&
+                        appt.cancellationFee > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOwnerPixModal({
+                                title: 'QR Code Pix — Taxa de Cancelamento',
+                                subtitle: `${appt.clientName} · ${formatShortDatePtBr(appt.date)} às ${appt.time}`,
+                                amount: appt.cancellationFee,
+                                feeLabel: 'Taxa de Cancelamento',
+                                txid: `TAXA${appt.date.replace(/-/g, '')}`,
+                                clientName: appt.clientName,
+                                clientPhone: appt.clientPhone,
+                              })
+                            }
+                            className="px-3 py-2 bg-[#7A2E4D] hover:bg-[#61233C] text-white text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>QR Code Pix (Taxa)</span>
+                          </button>
+                        )}
 
                       {appt.status === 'cancelled' &&
                         appt.cancellationType === 'late_fee' &&
@@ -1663,14 +1794,44 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={finSaving}
-                    className="w-full py-2.5 px-4 bg-[#7A2E4D] hover:bg-[#61233C] disabled:opacity-60 text-white text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-2"
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    <span>{finSaving ? 'Salvando...' : 'Registrar Entrada'}</span>
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="submit"
+                      disabled={finSaving}
+                      className="flex-1 py-2.5 px-4 bg-[#7A2E4D] hover:bg-[#61233C] disabled:opacity-60 text-white text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-2"
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      <span>{finSaving ? 'Salvando...' : 'Registrar Entrada'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parsed = Number(finAmount.replace(',', '.'));
+                        const amt =
+                          Number.isFinite(parsed) && parsed > 0
+                            ? parsed
+                            : studioConfig.lateCancellationFee || 35;
+                        setOwnerPixModal({
+                          title:
+                            finType === 'fee'
+                              ? 'QR Code Pix — Taxa'
+                              : 'QR Code Pix de Cobrança',
+                          subtitle: finClientName.trim()
+                            ? `Cliente: ${finClientName.trim()}`
+                            : finDesc.trim() || 'Cobrança instantânea via Pix',
+                          amount: amt,
+                          feeLabel: finType === 'fee' ? 'Valor da Taxa' : 'Valor a Pagar',
+                          txid: `PIX${finDate.replace(/-/g, '')}`,
+                          clientName: finClientName.trim() || undefined,
+                        });
+                      }}
+                      className="py-2.5 px-4 border border-[#7A2E4D] text-[#7A2E4D] hover:bg-[#FAF6F8] text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>Gerar QR Code Pix</span>
+                    </button>
+                  </div>
                 </form>
 
                 {/* Breakdown by Method */}
@@ -1778,7 +1939,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
             )}
 
             <form onSubmit={handleSaveStudioConfig} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#16141C] mb-1">
                     Nome do Salão / Estúdio
@@ -1793,31 +1954,54 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#16141C] mb-1">
-                    Taxa de cancelamento (&lt; 2 horas) em R$
+                    Taxa de reserva / sinal (Pix) em R$
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={cfgBookingFee}
+                    onChange={(e) => {
+                      setCfgBookingFee(e.target.value);
+                      if (Number(e.target.value) > 0) {
+                        setPixPreviewAmount(e.target.value);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2 text-sm font-mono tabular-nums border border-[#E4E2E8] rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#16141C] mb-1">
+                    Taxa de cancelamento (&lt; 2h) em R$
                   </label>
                   <input
                     type="number"
                     min={0}
                     step={1}
                     value={cfgLateFee}
-                    onChange={(e) => setCfgLateFee(e.target.value)}
+                    onChange={(e) => {
+                      setCfgLateFee(e.target.value);
+                      if (Number(e.target.value) > 0) {
+                        setPixPreviewAmount(e.target.value);
+                      }
+                    }}
                     className="w-full px-3.5 py-2 text-sm font-mono tabular-nums border border-[#E4E2E8] rounded-xl"
                   />
                 </div>
               </div>
 
-              {/* Chave Pix para Taxa de Cancelamento */}
-              <div className="p-4 rounded-2xl bg-[#FAFAFA] border border-[#E4E2E8] space-y-4">
+              {/* Chave Pix & Gerador de QR Code / Copia e Cola */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#FAFAFA] border border-[#E4E2E8] space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-white border border-[#E4E2E8] flex items-center justify-center shrink-0">
                     <QrCode className="w-4 h-4 text-[#7A2E4D]" />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-[#16141C]">
-                      Chave Pix para Taxa de Cancelamento
+                      Chave Pix e Gerador de QR Code / Copia e Cola
                     </h3>
                     <p className="text-xs text-[#5E5B66] mt-0.5">
-                      Quando uma cliente cancelar com menos de 2 horas e tiver que pagar a taxa, o app gera automaticamente um QR Code Pix e código Copia e Cola usando esta chave.
+                      Cadastre sua chave Pix para gerar na tela o QR Code e o código Pix Copia e Cola das taxas de cancelamento e reserva.
                     </p>
                   </div>
                 </div>
@@ -1859,6 +2043,63 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                       className="w-full px-3.5 py-2 text-sm bg-white border border-[#E4E2E8] rounded-xl"
                     />
                   </div>
+                </div>
+
+                {/* Live QR Code & Copia e Cola Generator */}
+                <div className="pt-4 border-t border-[#E4E2E8] space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-semibold text-[#16141C] mb-1">
+                        Valor da taxa para gerar o QR Code Pix (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={0.5}
+                        value={pixPreviewAmount}
+                        onChange={(e) => setPixPreviewAmount(e.target.value)}
+                        className="w-full sm:max-w-[180px] px-3.5 py-2 text-sm font-mono tabular-nums bg-white border border-[#E4E2E8] rounded-xl"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {Number(cfgLateFee) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPixPreviewAmount(cfgLateFee)}
+                          className="px-3 py-1.5 text-xs font-medium bg-white border border-[#E4E2E8] hover:border-[#7A2E4D] rounded-lg"
+                        >
+                          Taxa cancelamento ({formatCurrencyBRL(Number(cfgLateFee))})
+                        </button>
+                      )}
+                      {Number(cfgBookingFee) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPixPreviewAmount(cfgBookingFee)}
+                          className="px-3 py-1.5 text-xs font-medium bg-white border border-[#E4E2E8] hover:border-[#7A2E4D] rounded-lg"
+                        >
+                          Taxa reserva ({formatCurrencyBRL(Number(cfgBookingFee))})
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {cfgPixKey.trim() ? (
+                    <div className="bg-white border border-[#E4E2E8] rounded-2xl p-4">
+                      <PixQrDisplay
+                        pixKey={cfgPixKey}
+                        merchantName={cfgPixBeneficiaryName || cfgName || 'byannenails'}
+                        merchantCity={cfgPixCity || 'SAO PAULO'}
+                        amount={Math.max(0, Number(pixPreviewAmount.replace(',', '.')) || 0)}
+                        txid="TAXABYANNENAILS"
+                        feeLabel="QR Code da Taxa"
+                        compact
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#5E5B66]">
+                      Digite sua Chave Pix acima para gerar e visualizar o QR Code e o código Pix Copia e Cola na tela.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -2447,6 +2688,108 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: QR CODE PIX & COPIA E COLA (OWNER) */}
+      {ownerPixModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E4E2E8] rounded-2xl max-w-md w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-[#7A2E4D]">
+                  {ownerPixModal.title}
+                </p>
+                <h3 className="font-display text-2xl font-semibold text-[#16141C] mt-0.5">
+                  Pix · {formatCurrencyBRL(ownerPixModal.amount)}
+                </h3>
+                <p className="text-xs text-[#5E5B66] mt-0.5">
+                  {ownerPixModal.subtitle}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOwnerPixModal(null)}
+                aria-label="Fechar janela Pix"
+                className="p-1.5 text-[#5E5B66] hover:text-[#16141C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {(studioConfig.pixKey || '').trim() ? (
+              <PixQrDisplay
+                pixKey={(studioConfig.pixKey || '').trim()}
+                merchantName={studioConfig.pixBeneficiaryName || studioConfig.studioName}
+                merchantCity={studioConfig.pixCity || 'SAO PAULO'}
+                amount={ownerPixModal.amount}
+                txid={ownerPixModal.txid}
+                feeLabel={ownerPixModal.feeLabel}
+              />
+            ) : (
+              <form
+                onSubmit={handleSaveQuickPixKey}
+                className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-3"
+              >
+                <p className="text-xs font-semibold text-amber-950">
+                  Informe sua Chave Pix para gerar o QR Code e o Copia e Cola agora:
+                </p>
+                <input
+                  type="text"
+                  required
+                  value={quickPixKeyInput}
+                  onChange={(e) => setQuickPixKeyInput(e.target.value)}
+                  placeholder="CPF, CNPJ, e-mail, celular ou chave aleatória"
+                  className="w-full px-3 py-2 text-xs font-mono bg-white border border-amber-300 rounded-xl"
+                />
+                <button
+                  type="submit"
+                  disabled={savingQuickPixKey}
+                  className="w-full py-2 px-4 bg-[#7A2E4D] hover:bg-[#61233C] text-white text-xs font-semibold rounded-xl"
+                >
+                  {savingQuickPixKey
+                    ? 'Salvando e gerando...'
+                    : 'Salvar Chave e Gerar QR Code Pix'}
+                </button>
+              </form>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#E4E2E8]">
+              {(studioConfig.pixKey || '').trim() && ownerPixModal.clientPhone && (
+                <a
+                  href={buildWhatsAppUrl(
+                    ownerPixModal.clientPhone,
+                    [
+                      `Olá ${ownerPixModal.clientName || ''}!`,
+                      `Segue o código Pix Copia e Cola para pagamento (${formatCurrencyBRL(ownerPixModal.amount)}) no ${studioConfig.studioName}:`,
+                      '',
+                      buildPixPayload({
+                        pixKey: (studioConfig.pixKey || '').trim(),
+                        merchantName:
+                          studioConfig.pixBeneficiaryName || studioConfig.studioName,
+                        merchantCity: studioConfig.pixCity || 'SAO PAULO',
+                        amount: ownerPixModal.amount,
+                        txid: ownerPixModal.txid,
+                      }),
+                    ].join('\n')
+                  )}
+                  target={WHATSAPP_TAB_TARGET}
+                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Enviar Copia e Cola no WhatsApp</span>
+                </a>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setOwnerPixModal(null)}
+                className="px-4 py-2 text-xs font-medium text-[#5E5B66] hover:text-[#16141C] ml-auto"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

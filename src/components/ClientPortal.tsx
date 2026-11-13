@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import QRCode from 'qrcode';
 import {
   collection,
   doc,
@@ -9,12 +8,10 @@ import {
 import {
   AlertTriangle,
   Calendar as CalendarIcon,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
-  Copy,
   ExternalLink,
   Instagram,
   Lock,
@@ -54,7 +51,7 @@ import {
   toDateKey,
   WHATSAPP_TAB_TARGET,
 } from '../utils/formatters';
-import { buildPixPayload } from '../utils/pix';
+import { PixQrDisplay } from './PixQrDisplay';
 
 type ClientTab = 'agenda' | 'my_bookings' | 'location';
 
@@ -134,10 +131,15 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   } | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  // Pix Cancellation Fee QR Code Modal State
-  const [pixFeeModalAppt, setPixFeeModalAppt] = useState<Appointment | null>(null);
-  const [pixQrDataUrl, setPixQrDataUrl] = useState<string | null>(null);
-  const [pixCopied, setPixCopied] = useState<'code' | 'key' | null>(null);
+  // Pix Fee QR Code Modal State
+  const [pixFeeModal, setPixFeeModal] = useState<{
+    appt: Appointment;
+    amount: number;
+    title: string;
+    feeLabel: string;
+    txid: string;
+    whatsappMessage: string;
+  } | null>(null);
 
   // Sync profile fields if clientProfile loads asynchronously
   React.useEffect(() => {
@@ -428,7 +430,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
           setConfirmedReceipt(null);
         }
         if (cancelledWithFeeAppt) {
-          setPixFeeModalAppt(cancelledWithFeeAppt);
+          openLateFeePixModal(cancelledWithFeeAppt);
         }
       } finally {
         setCancelLoading(false);
@@ -455,7 +457,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         setConfirmedReceipt(null);
       }
       if (cancelledWithFeeAppt) {
-        setPixFeeModalAppt(cancelledWithFeeAppt);
+        openLateFeePixModal(cancelledWithFeeAppt);
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `appointments/${appt.id}`);
@@ -465,45 +467,33 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   };
 
   const pixKeyConfigured = (studioConfig.pixKey || '').trim();
-  const pixPayload = useMemo(() => {
-    if (!pixFeeModalAppt || !pixKeyConfigured || pixFeeModalAppt.cancellationFee <= 0) {
-      return '';
-    }
-    return buildPixPayload({
-      pixKey: pixKeyConfigured,
-      merchantName: studioConfig.pixBeneficiaryName || studioConfig.studioName,
-      merchantCity: studioConfig.pixCity || 'SAO PAULO',
-      amount: pixFeeModalAppt.cancellationFee,
-      txid: `TAXA${pixFeeModalAppt.date.replace(/-/g, '')}`,
+  const bookingFeeAmount = Math.max(0, Number(studioConfig.bookingFee || 0));
+
+  const openLateFeePixModal = (appt: Appointment) => {
+    const amount = appt.cancellationFee;
+    setPixFeeModal({
+      appt,
+      amount,
+      title: 'Pagamento da Taxa de Cancelamento',
+      feeLabel: 'Taxa de Cancelamento',
+      txid: `TAXA${appt.date.replace(/-/g, '')}`,
+      whatsappMessage: `Olá Anne Caroline! Segue o comprovante do pagamento via Pix da taxa de cancelamento (${formatCurrencyBRL(amount)}) do horário de ${formatShortDatePtBr(appt.date)} às ${appt.time}.`,
     });
-  }, [pixFeeModalAppt, pixKeyConfigured, studioConfig]);
+  };
 
-  React.useEffect(() => {
-    if (!pixPayload) {
-      setPixQrDataUrl(null);
-      return;
-    }
-    let cancelled = false;
-    QRCode.toDataURL(pixPayload, {
-      width: 240,
-      margin: 2,
-      color: { dark: '#16141C', light: '#FFFFFF' },
-    })
-      .then((url) => {
-        if (!cancelled) setPixQrDataUrl(url);
-      })
-      .catch(() => {
-        if (!cancelled) setPixQrDataUrl(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pixPayload]);
-
-  const handleCopyPix = (text: string, kind: 'code' | 'key') => {
-    navigator.clipboard.writeText(text);
-    setPixCopied(kind);
-    window.setTimeout(() => setPixCopied(null), 2200);
+  const openBookingPixModal = (
+    appt: Appointment,
+    amount: number,
+    isBookingFee: boolean
+  ) => {
+    setPixFeeModal({
+      appt,
+      amount,
+      title: isBookingFee ? 'Pagamento da Taxa de Reserva' : 'Pagamento via Pix',
+      feeLabel: isBookingFee ? 'Taxa de Reserva (Pix)' : 'Valor do Atendimento (Pix)',
+      txid: `${isBookingFee ? 'SINAL' : 'ATEND'}${appt.date.replace(/-/g, '')}`,
+      whatsappMessage: `Olá Anne Caroline! Segue o comprovante do pagamento via Pix (${formatCurrencyBRL(amount)}) referente ao horário de ${formatShortDatePtBr(appt.date)} às ${appt.time} (${appt.serviceName}).`,
+    });
   };
 
   const sortedAppointments = useMemo(() => {
@@ -524,9 +514,18 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       {/* Top Navigation Bar (Strict 3-Zone Contract) */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-[#E4E2E8]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-6">
-          <span className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-[#16141C] whitespace-nowrap shrink-0">
-            {studioConfig.studioName}
-          </span>
+          <div className="flex items-center gap-2.5 whitespace-nowrap shrink-0">
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-[#E4E2E8] shrink-0 bg-[#F28BB2]">
+              <img
+                src="/assets/aistudio/WhatsApp_Image_2026-11-13_at_08.55.39_5baf2dd3.jpeg"
+                alt="Logo byannenails"
+                className="w-full h-full object-cover scale-110"
+              />
+            </div>
+            <span className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-[#16141C]">
+              {studioConfig.studioName}
+            </span>
+          </div>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-[#5E5B66]">
             <button
@@ -682,6 +681,21 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                  {bookingFeeAmount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openBookingPixModal(confirmedReceipt, bookingFeeAmount, true)
+                      }
+                      className="px-4 py-2.5 bg-[#7A2E4D] hover:bg-[#61233C] text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+                    >
+                      <QrCode className="w-4 h-4" />
+                      <span>
+                        Pagar Taxa de Reserva ({formatCurrencyBRL(bookingFeeAmount)})
+                      </span>
+                    </button>
+                  )}
+
                   <a
                     href={buildBookingConfirmationWhatsAppUrl(confirmedReceipt)}
                     target={WHATSAPP_TAB_TARGET}
@@ -1079,6 +1093,15 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                           <p className="font-semibold text-[#16141C]">
                             Informações do Agendamento
                           </p>
+                          {bookingFeeAmount > 0 && (
+                            <p className="text-[#7A2E4D] font-medium">
+                              Taxa de reserva via Pix:{' '}
+                              <span className="font-mono tabular-nums font-bold">
+                                {formatCurrencyBRL(bookingFeeAmount)}
+                              </span>{' '}
+                              (QR Code Pix e código Copia e Cola exibidos na tela ao confirmar).
+                            </p>
+                          )}
                           <p>
                             <span className="font-semibold">Pagamento após o atendimento:</span>{' '}
                             O valor de{' '}
@@ -1093,7 +1116,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                             <span className="font-mono tabular-nums font-semibold text-[#16141C]">
                               {formatCurrencyBRL(studioConfig.lateCancellationFee)}
                             </span>
-                            .
+                            {' '}(QR Code Pix e código Copia e Cola).
                           </p>
                         </div>
 
@@ -1232,7 +1255,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                             <button
                               type="button"
-                              onClick={() => setPixFeeModalAppt(appt)}
+                              onClick={() => openLateFeePixModal(appt)}
                               className="px-4 py-2 bg-[#7A2E4D] hover:bg-[#61233C] text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
                             >
                               <QrCode className="w-3.5 h-3.5" />
@@ -1243,6 +1266,25 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
                       {appt.status === 'confirmed' && (
                         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                          {(bookingFeeAmount > 0 || (appt.paymentMethod === 'Pix' && pixKeyConfigured)) && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openBookingPixModal(
+                                  appt,
+                                  bookingFeeAmount > 0 ? bookingFeeAmount : appt.servicePrice,
+                                  bookingFeeAmount > 0
+                                )
+                              }
+                              className="px-3.5 py-2 bg-[#7A2E4D] hover:bg-[#61233C] text-white rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-colors"
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                              <span>
+                                {bookingFeeAmount > 0 ? 'Pagar Taxa via Pix' : 'QR Code Pix'}
+                              </span>
+                            </button>
+                          )}
+
                           <a
                             href={buildWhatsAppUrl(
                               studioConfig.ownerPhone,
@@ -1471,25 +1513,26 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         </div>
       )}
 
-      {/* Pix QR Code Modal for Late Cancellation Fee */}
-      {pixFeeModalAppt && (
+      {/* Pix QR Code Modal for Fee Payment */}
+      {pixFeeModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-[#E4E2E8] rounded-2xl max-w-md w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E4E2E8] rounded-2xl max-w-md w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-[#7A2E4D]">
-                  Pagamento da Taxa de Cancelamento
+                  {pixFeeModal.title}
                 </p>
                 <h3 className="font-display text-2xl font-semibold text-[#16141C] mt-0.5">
-                  Pix QR Code · {formatCurrencyBRL(pixFeeModalAppt.cancellationFee)}
+                  Pix QR Code · {formatCurrencyBRL(pixFeeModal.amount)}
                 </h3>
                 <p className="text-xs text-[#5E5B66] mt-0.5">
-                  Referente ao horário de {formatShortDatePtBr(pixFeeModalAppt.date)} às {pixFeeModalAppt.time}
+                  Referente ao horário de {formatShortDatePtBr(pixFeeModal.appt.date)} às{' '}
+                  {pixFeeModal.appt.time}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setPixFeeModalAppt(null)}
+                onClick={() => setPixFeeModal(null)}
                 aria-label="Fechar janela Pix"
                 className="p-1.5 text-[#5E5B66] hover:text-[#16141C]"
               >
@@ -1498,88 +1541,20 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             </div>
 
             {pixKeyConfigured ? (
-              <div className="space-y-4">
-                <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-[#FAFAFA] border border-[#E4E2E8] space-y-3">
-                  {pixQrDataUrl ? (
-                    <img
-                      src={pixQrDataUrl}
-                      alt="QR Code Pix para pagamento da taxa"
-                      className="w-52 h-52 rounded-xl bg-white p-2 border border-[#E4E2E8]"
-                    />
-                  ) : (
-                    <div className="w-52 h-52 rounded-xl bg-white border border-[#E4E2E8] flex items-center justify-center text-xs text-[#5E5B66]">
-                      Gerando QR Code...
-                    </div>
-                  )}
-                  <p className="text-xs text-[#5E5B66] text-center">
-                    Recebedor:{' '}
-                    <span className="font-semibold text-[#16141C]">
-                      {studioConfig.pixBeneficiaryName || studioConfig.studioName}
-                    </span>
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#F3F2F5] border border-[#E4E2E8] space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-[#16141C]">
-                      Chave Pix
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPix(pixKeyConfigured, 'key')}
-                      className="text-xs font-semibold text-[#7A2E4D] hover:underline inline-flex items-center gap-1"
-                    >
-                      {pixCopied === 'key' ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-emerald-700" />
-                          <span className="text-emerald-700">Chave copiada!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copiar chave</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs font-mono break-all text-[#16141C]">
-                    {pixKeyConfigured}
-                  </p>
-                </div>
-
-                {pixPayload && (
-                  <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-[#16141C]">
-                      Pix Copia e Cola
-                    </label>
-                    <div className="p-2.5 rounded-xl border border-[#E4E2E8] bg-white text-[11px] font-mono break-all text-[#5E5B66] max-h-20 overflow-y-auto">
-                      {pixPayload}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyPix(pixPayload, 'code')}
-                      className="w-full py-2.5 px-4 bg-[#7A2E4D] hover:bg-[#61233C] text-white text-xs font-semibold rounded-xl inline-flex items-center justify-center gap-2 transition-colors"
-                    >
-                      {pixCopied === 'code' ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          <span>Código Pix Copia e Cola copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          <span>Copiar Pix Copia e Cola</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <PixQrDisplay
+                pixKey={pixKeyConfigured}
+                merchantName={studioConfig.pixBeneficiaryName || studioConfig.studioName}
+                merchantCity={studioConfig.pixCity || 'SAO PAULO'}
+                amount={pixFeeModal.amount}
+                txid={pixFeeModal.txid}
+                feeLabel={pixFeeModal.feeLabel}
+              />
             ) : (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-1.5">
                 <p className="font-semibold">Chave Pix ainda não cadastrada pelo estúdio</p>
                 <p>
-                  Entre em contato pelo WhatsApp abaixo para receber a chave Pix e quitar a taxa de {formatCurrencyBRL(pixFeeModalAppt.cancellationFee)}.
+                  Entre em contato pelo WhatsApp abaixo para receber a chave Pix e quitar o valor de{' '}
+                  {formatCurrencyBRL(pixFeeModal.amount)}.
                 </p>
               </div>
             )}
@@ -1588,7 +1563,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               <a
                 href={buildWhatsAppUrl(
                   studioConfig.ownerPhone,
-                  `Olá Anne Caroline! Segue o comprovante do pagamento via Pix da taxa de cancelamento (${formatCurrencyBRL(pixFeeModalAppt.cancellationFee)}) do horário de ${formatShortDatePtBr(pixFeeModalAppt.date)} às ${pixFeeModalAppt.time}.`
+                  pixFeeModal.whatsappMessage
                 )}
                 target={WHATSAPP_TAB_TARGET}
                 className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors"
@@ -1599,7 +1574,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
               <button
                 type="button"
-                onClick={() => setPixFeeModalAppt(null)}
+                onClick={() => setPixFeeModal(null)}
                 className="px-4 py-2 text-xs font-medium text-[#5E5B66] hover:text-[#16141C]"
               >
                 Fechar
@@ -1673,10 +1648,36 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   {studioConfig.address}
                 </p>
                 <p className="text-[#5E5B66]">
-                  Pagamento presencial após o atendimento. Cancelamento gratuito até 2h antes.
+                  {bookingFeeAmount > 0
+                    ? `Taxa de reserva via Pix: ${formatCurrencyBRL(bookingFeeAmount)}. Restante após o atendimento.`
+                    : 'Pagamento presencial após o atendimento. Cancelamento gratuito até 2h antes.'}
                 </p>
               </div>
             </div>
+
+            {bookingFeeAmount > 0 && (
+              <div className="p-4 rounded-2xl border border-[#E4E2E8] bg-[#FAFAFA] space-y-3">
+                <p className="text-xs font-semibold text-[#7A2E4D]">
+                  Pagamento da Taxa de Reserva via Pix
+                </p>
+                {pixKeyConfigured ? (
+                  <PixQrDisplay
+                    pixKey={pixKeyConfigured}
+                    merchantName={studioConfig.pixBeneficiaryName || studioConfig.studioName}
+                    merchantCity={studioConfig.pixCity || 'SAO PAULO'}
+                    amount={bookingFeeAmount}
+                    txid={`SINAL${confirmationModalAppt.date.replace(/-/g, '')}`}
+                    feeLabel="Taxa de Reserva"
+                    compact
+                  />
+                ) : (
+                  <p className="text-xs text-amber-900">
+                    Solicite a chave Pix pelo WhatsApp abaixo para pagar a taxa de{' '}
+                    {formatCurrencyBRL(bookingFeeAmount)}.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2.5">
               <a

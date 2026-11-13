@@ -60,7 +60,6 @@ export const AuthScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [heroImgFailed, setHeroImgFailed] = useState(false);
-  const [avatarImgFailed, setAvatarImgFailed] = useState(false);
 
   const isProviderDisabledError = (err: unknown): boolean => {
     const code = (err as { code?: string })?.code || '';
@@ -402,7 +401,7 @@ export const AuthScreen: React.FC = () => {
           {!heroImgFailed ? (
             <img
               src={STUDIO_IMAGES.hero}
-              alt="Atelier Anne Caroline Nail Designer"
+              alt="byannenails Nail Designer"
               referrerPolicy="no-referrer"
               onError={() => setHeroImgFailed(true)}
               className="absolute inset-0 w-full h-full object-cover"
@@ -415,7 +414,7 @@ export const AuthScreen: React.FC = () => {
           <div className="relative z-10 p-8 sm:p-10 text-white space-y-6">
             <div className="space-y-2.5">
               <p className="text-xs font-medium tracking-widest uppercase text-white/80">
-                Atelier Anne Caroline
+                byannenails
               </p>
               <h1 className="font-display text-4xl sm:text-5xl font-semibold leading-tight text-balance">
                 Agenda exclusiva de nail design.
@@ -423,21 +422,15 @@ export const AuthScreen: React.FC = () => {
             </div>
 
             <div className="pt-5 border-t border-white/20 flex items-center gap-4">
-              {!avatarImgFailed ? (
+              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white/50 shadow-sm shrink-0 bg-[#F28BB2]">
                 <img
-                  src={STUDIO_IMAGES.ownerAvatar}
-                  alt="Anne Caroline Nail Designer"
-                  referrerPolicy="no-referrer"
-                  onError={() => setAvatarImgFailed(true)}
-                  className="w-12 h-12 rounded-full object-cover border border-white/40 shrink-0"
+                  src="/assets/aistudio/WhatsApp_Image_2026-11-13_at_08.55.39_5baf2dd3.jpeg"
+                  alt="Logo byannenails"
+                  className="w-full h-full object-cover scale-110"
                 />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-[#7A2E4D] flex items-center justify-center text-white font-semibold shrink-0">
-                  AC
-                </div>
-              )}
+              </div>
               <div>
-                <p className="text-sm font-semibold text-white">Anne Caroline</p>
+                <p className="text-sm font-semibold text-white">byannenails</p>
                 <p className="text-xs text-white/75">
                   Fibra de Vidro · Banho de Gel · Esmaltação
                 </p>
