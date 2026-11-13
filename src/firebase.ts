@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { ActionCodeSettings, getAuth } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -8,6 +8,15 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
 export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
+export const APP_PUBLIC_DOMAIN = 'agendanails-psi.vercel.app';
+export const APP_PUBLIC_URL = `https://${APP_PUBLIC_DOMAIN}/`;
+
+export function getAuthActionCodeSettings(): ActionCodeSettings {
+  return {
+    url: APP_PUBLIC_URL,
+    handleCodeInApp: false,
+  };
+}
 
 export enum OperationType {
   CREATE = 'create',

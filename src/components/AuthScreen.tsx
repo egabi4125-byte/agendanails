@@ -22,6 +22,7 @@ import {
 import {
   auth,
   db,
+  getAuthActionCodeSettings,
   handleFirestoreError,
   OperationType,
 } from '../firebase';
@@ -225,9 +226,13 @@ export const AuthScreen: React.FC = () => {
           true
         );
         try {
-          await sendEmailVerification(cred.user);
+          await sendEmailVerification(cred.user, getAuthActionCodeSettings());
         } catch {
-          // Non-blocking verification email
+          try {
+            await sendEmailVerification(cred.user);
+          } catch {
+            // Non-blocking verification email
+          }
         }
       } catch (fbErr) {
         if (isProviderDisabledError(fbErr)) {
@@ -277,7 +282,24 @@ export const AuthScreen: React.FC = () => {
       }
 
       try {
-        await sendPasswordResetEmail(auth, resetEmail.trim());
+        try {
+          await sendPasswordResetEmail(
+            auth,
+            resetEmail.trim(),
+            getAuthActionCodeSettings()
+          );
+        } catch (actionUrlErr) {
+          const errCode = (actionUrlErr as { code?: string })?.code || '';
+          if (
+            errCode === 'auth/unauthorized-continue-uri' ||
+            errCode === 'auth/invalid-continue-uri' ||
+            errCode === 'auth/invalid-link-domain'
+          ) {
+            await sendPasswordResetEmail(auth, resetEmail.trim());
+          } else {
+            throw actionUrlErr;
+          }
+        }
         setResetSent(true);
       } catch (fbErr) {
         if (isProviderDisabledError(fbErr)) {
