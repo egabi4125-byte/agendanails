@@ -366,6 +366,11 @@
           "minLength": 0,
           "maxLength": 120
         },
+        "instagramUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
         "lateCancellationFee": {
           "type": "number"
         },

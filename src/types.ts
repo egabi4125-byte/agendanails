@@ -83,6 +83,7 @@ export interface StudioConfig {
   mapsUrl: string;
   ownerPhone: string;
   ownerEmail: string;
+  instagramUrl?: string;
   lateCancellationFee: number;
   pixKey?: string;
   pixBeneficiaryName?: string;
@@ -124,6 +125,7 @@ export const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   mapsUrl: 'https://maps.google.com/?q=Rua+das+Flores+240+Centro',
   ownerPhone: '5511999999999',
   ownerEmail: 'contato@atelierannecaroline.com',
+  instagramUrl: 'https://instagram.com/atelierannecaroline',
   lateCancellationFee: 35,
   pixKey: '',
   pixBeneficiaryName: 'Anne Caroline',

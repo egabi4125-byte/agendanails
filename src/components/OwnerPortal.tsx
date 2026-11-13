@@ -15,6 +15,7 @@ import {
   Copy,
   DollarSign,
   Edit3,
+  Instagram,
   Lock,
   LogOut,
   MapPin,
@@ -142,6 +143,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
   const [cfgMaps, setCfgMaps] = useState(studioConfig.mapsUrl);
   const [cfgPhone, setCfgPhone] = useState(studioConfig.ownerPhone);
   const [cfgEmail, setCfgEmail] = useState(studioConfig.ownerEmail);
+  const [cfgInstagram, setCfgInstagram] = useState(studioConfig.instagramUrl || '');
   const [cfgLateFee, setCfgLateFee] = useState(String(studioConfig.lateCancellationFee));
   const [cfgPixKey, setCfgPixKey] = useState(studioConfig.pixKey || '');
   const [cfgPixBeneficiaryName, setCfgPixBeneficiaryName] = useState(
@@ -160,6 +162,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
     setCfgMaps(studioConfig.mapsUrl);
     setCfgPhone(studioConfig.ownerPhone);
     setCfgEmail(studioConfig.ownerEmail);
+    setCfgInstagram(studioConfig.instagramUrl || '');
     setCfgLateFee(String(studioConfig.lateCancellationFee));
     setCfgPixKey(studioConfig.pixKey || '');
     setCfgPixBeneficiaryName(studioConfig.pixBeneficiaryName || 'Anne Caroline');
@@ -855,6 +858,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
         `https://maps.google.com/?q=${encodeURIComponent(cfgAddress.trim())}`,
       ownerPhone: cfgPhone.trim().slice(0, 25),
       ownerEmail: cfgEmail.trim().slice(0, 120),
+      instagramUrl: cfgInstagram.trim().slice(0, 300),
       lateCancellationFee: Math.max(0, Number(cfgLateFee) || 0),
       pixKey: cfgPixKey.trim().slice(0, 140),
       pixBeneficiaryName: cfgPixBeneficiaryName.trim().slice(0, 60) || 'Anne Caroline',
@@ -1862,7 +1866,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#16141C] mb-1">
                     WhatsApp do Salão
@@ -1884,6 +1888,21 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                     onChange={(e) => setCfgEmail(e.target.value)}
                     className="w-full px-3.5 py-2 text-sm border border-[#E4E2E8] rounded-xl"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#16141C] mb-1">
+                    Instagram do Salão (@perfil ou link)
+                  </label>
+                  <div className="relative">
+                    <Instagram className="w-4 h-4 text-[#7A2E4D] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={cfgInstagram}
+                      onChange={(e) => setCfgInstagram(e.target.value)}
+                      placeholder="@atelierannecaroline"
+                      className="w-full pl-9 pr-3.5 py-2 text-sm border border-[#E4E2E8] rounded-xl"
+                    />
+                  </div>
                 </div>
               </div>
 

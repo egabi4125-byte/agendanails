@@ -51,6 +51,16 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   return `https://wa.me/${cleaned}?text=${encoded}`;
 }
 
+export function buildInstagramUrl(input?: string): string {
+  const raw = (input || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^(www\.)?instagram\.com\//i.test(raw)) return `https://${raw}`;
+  const handle = raw.replace(/^@+/, '').replace(/\s+/g, '');
+  if (!handle) return '';
+  return `https://instagram.com/${encodeURIComponent(handle)}`;
+}
+
 export function buildMailtoUrl(email: string, subject: string, body: string): string {
   return `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

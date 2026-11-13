@@ -4,7 +4,6 @@ import {
   collection,
   doc,
   serverTimestamp,
-  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import {
@@ -17,7 +16,7 @@ import {
   Clock,
   Copy,
   ExternalLink,
-  Image as ImageIcon,
+  Instagram,
   Lock,
   LogOut,
   Mail,
@@ -39,9 +38,9 @@ import {
   SlotDoc,
   STUDIO_IMAGES,
   StudioConfig,
-  WALLPAPER_OPTIONS,
 } from '../types';
 import {
+  buildInstagramUrl,
   buildMailtoUrl,
   buildWhatsAppUrl,
   formatCurrencyBRL,
@@ -57,7 +56,7 @@ import {
 } from '../utils/formatters';
 import { buildPixPayload } from '../utils/pix';
 
-type ClientTab = 'agenda' | 'my_bookings' | 'location' | 'wallpaper';
+type ClientTab = 'agenda' | 'my_bookings' | 'location';
 
 interface ClientPortalProps {
   uid: string;
@@ -140,17 +139,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [pixQrDataUrl, setPixQrDataUrl] = useState<string | null>(null);
   const [pixCopied, setPixCopied] = useState<'code' | 'key' | null>(null);
 
-  // Wallpaper State
-  const [wallpaperChoice, setWallpaperChoice] = useState(
-    clientProfile?.wallpaper || 'default'
-  );
-  const [wallpaperOpacity, setWallpaperOpacity] = useState(
-    clientProfile?.wallpaperOpacity ?? 0.35
-  );
-  const [wallpaperSaving, setWallpaperSaving] = useState(false);
-  const [wallpaperSavedMsg, setWallpaperSavedMsg] = useState(false);
-  const [wallpaperImgErrors, setWallpaperImgErrors] = useState<Record<string, boolean>>({});
-
   // Sync profile fields if clientProfile loads asynchronously
   React.useEffect(() => {
     if (clientProfile) {
@@ -159,8 +147,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         prev || (clientProfile.phone === '(00) 00000-0000' ? '' : clientProfile.phone)
       );
       setEmail((prev) => prev || clientProfile.email);
-      setWallpaperChoice(clientProfile.wallpaper || 'default');
-      setWallpaperOpacity(clientProfile.wallpaperOpacity ?? 0.35);
     }
   }, [clientProfile]);
 
@@ -221,9 +207,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     studioConfig.services.find((s) => s.id === selectedServiceId) ||
     studioConfig.services[0];
 
-  const activeWallpaper =
-    WALLPAPER_OPTIONS.find((w) => w.id === (clientProfile?.wallpaper || wallpaperChoice)) ||
-    WALLPAPER_OPTIONS[0];
+  const studioInstagramUrl = buildInstagramUrl(studioConfig.instagramUrl);
 
   const handlePrevMonth = () => {
     if (viewMonth === 0) {
@@ -508,40 +492,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
     window.setTimeout(() => setPixCopied(null), 2200);
   };
 
-  const handleSaveWallpaper = async () => {
-    setWallpaperSaving(true);
-    setWallpaperSavedMsg(false);
-    if (useServerFallback) {
-      try {
-        await apiRequest('/api/studio/clients/wallpaper', {
-          method: 'PUT',
-          body: JSON.stringify({
-            wallpaper: wallpaperChoice,
-            wallpaperOpacity,
-          }),
-        });
-        await onServerRefresh?.();
-        setWallpaperSavedMsg(true);
-      } finally {
-        setWallpaperSaving(false);
-      }
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, 'clients', uid), {
-        wallpaper: wallpaperChoice,
-        wallpaperOpacity,
-        updatedAt: serverTimestamp(),
-      });
-      setWallpaperSavedMsg(true);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `clients/${uid}`);
-    } finally {
-      setWallpaperSaving(false);
-    }
-  };
-
   const sortedAppointments = useMemo(() => {
     return [...appointments].sort((a, b) => {
       if (a.status === 'confirmed' && b.status !== 'confirmed') return -1;
@@ -556,35 +506,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   return (
     <div className="min-h-screen relative text-[#16141C] flex flex-col bg-[#FAFAFA]">
-      {/* Client-Only Personalized Wallpaper Backdrop */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        {activeWallpaper.imageUrl && !wallpaperImgErrors[activeWallpaper.id] ? (
-          <img
-            src={activeWallpaper.imageUrl}
-            alt=""
-            referrerPolicy="no-referrer"
-            onError={() =>
-              setWallpaperImgErrors((prev) => ({
-                ...prev,
-                [activeWallpaper.id]: true,
-              }))
-            }
-            style={{ opacity: clientProfile?.wallpaperOpacity ?? wallpaperOpacity }}
-            className="w-full h-full object-cover transition-opacity duration-300"
-          />
-        ) : (
-          <div
-            style={{
-              background: activeWallpaper.previewBg,
-              opacity:
-                activeWallpaper.id === 'default'
-                  ? 1
-                  : clientProfile?.wallpaperOpacity ?? wallpaperOpacity,
-            }}
-            className="w-full h-full"
-          />
-        )}
-      </div>
 
       {/* Top Navigation Bar (Strict 3-Zone Contract) */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-[#E4E2E8]">
@@ -627,17 +548,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             >
               Localização
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('wallpaper')}
-              className={`py-1 border-b-2 transition-colors whitespace-nowrap shrink-0 ${
-                activeTab === 'wallpaper'
-                  ? 'border-[#7A2E4D] text-[#16141C]'
-                  : 'border-transparent hover:text-[#16141C]'
-              }`}
-            >
-              Papel de Parede
-            </button>
           </nav>
 
           <button
@@ -657,7 +567,6 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
               ['agenda', 'Agenda'],
               ['my_bookings', `Meus Horários (${upcomingConfirmedCount})`],
               ['location', 'Localização'],
-              ['wallpaper', 'Papel de Parede'],
             ] as [ClientTab, string][]
           ).map(([id, label]) => (
             <button
@@ -677,9 +586,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 space-y-6">
         {/* Welcome Header */}
-        <div className="bg-white/95 backdrop-blur-sm border border-[#E4E2E8] rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-white border border-[#E4E2E8] rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs text-[#5E5B66]">
               Área da Cliente · {clientProfile?.email || 'Conta conectada'}
@@ -690,8 +599,21 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             </h1>
           </div>
 
-          <div className="text-xs text-[#5E5B66]">
-            <span>Selecione uma data no calendário para agendar</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {studioInstagramUrl && (
+              <a
+                href={studioInstagramUrl}
+                target="atelier_instagram_tab"
+                className="px-4 py-2 border border-[#E4E2E8] hover:border-[#7A2E4D]/50 hover:bg-[#FAF6F8] text-[#16141C] text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+              >
+                <Instagram className="w-4 h-4 text-[#7A2E4D]" />
+                <span>Instagram do Salão</span>
+                <ExternalLink className="w-3 h-3 text-[#5E5B66]" />
+              </a>
+            )}
+            <span className="text-xs text-[#5E5B66]">
+              Selecione uma data no calendário para agendar
+            </span>
           </div>
         </div>
 
@@ -1419,6 +1341,18 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                   <MessageCircle className="w-4 h-4 text-emerald-700" />
                   <span>Falar no WhatsApp</span>
                 </a>
+
+                {studioInstagramUrl && (
+                  <a
+                    href={studioInstagramUrl}
+                    target="atelier_instagram_tab"
+                    className="px-4 py-2.5 border border-[#E4E2E8] hover:bg-[#F3F2F5] text-[#16141C] text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <Instagram className="w-4 h-4 text-[#7A2E4D]" />
+                    <span>Instagram</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-[#5E5B66]" />
+                  </a>
+                )}
               </div>
             </div>
 
@@ -1432,112 +1366,22 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
             </div>
           </section>
         )}
-
-        {/* TAB: PERSONALIZAR PAPEL DE PAREDE (CLIENT-ONLY) */}
-        {activeTab === 'wallpaper' && (
-          <section className="bg-white/95 backdrop-blur-sm border border-[#E4E2E8] rounded-2xl p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E4E2E8] pb-4">
-              <div>
-                <h2 className="font-display text-2xl font-semibold text-[#16141C]">
-                  Personalizar Papel de Parede da Agenda
-                </h2>
-                <p className="text-sm text-[#5E5B66]">
-                  Escolha o fundo visual da sua agenda. Esta personalização fica salva no banco de dados e é visível apenas na sua conta.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={wallpaperSaving}
-                onClick={handleSaveWallpaper}
-                className="px-5 py-2.5 bg-[#7A2E4D] hover:bg-[#61233C] disabled:opacity-60 text-white text-xs font-semibold rounded-xl transition-colors whitespace-nowrap shrink-0"
-              >
-                {wallpaperSaving ? 'Salvando...' : 'Salvar Papel de Parede'}
-              </button>
-            </div>
-
-            {wallpaperSavedMsg && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-medium text-emerald-800 inline-flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Papel de parede atualizado na sua conta!</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {WALLPAPER_OPTIONS.map((wp) => {
-                const isSelected = wallpaperChoice === wp.id;
-                return (
-                  <button
-                    key={wp.id}
-                    type="button"
-                    onClick={() => {
-                      setWallpaperChoice(wp.id);
-                      setWallpaperSavedMsg(false);
-                    }}
-                    className={`text-left rounded-2xl border overflow-hidden transition-all ${
-                      isSelected
-                        ? 'border-[#7A2E4D] ring-2 ring-[#7A2E4D]/30 bg-white'
-                        : 'border-[#E4E2E8] bg-white hover:border-[#7A2E4D]/50'
-                    }`}
-                  >
-                    <div className="h-36 w-full relative bg-[#F3F2F5]">
-                      {wp.imageUrl && !wallpaperImgErrors[wp.id] ? (
-                        <img
-                          src={wp.imageUrl}
-                          alt={wp.label}
-                          referrerPolicy="no-referrer"
-                          onError={() =>
-                            setWallpaperImgErrors((prev) => ({ ...prev, [wp.id]: true }))
-                          }
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          style={{ background: wp.previewBg }}
-                          className="w-full h-full flex items-center justify-center"
-                        >
-                          <ImageIcon className="w-6 h-6 text-[#5E5B66]/40" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4 space-y-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-[#16141C]">
-                          {wp.label}
-                        </span>
-                        {isSelected && (
-                          <CheckCircle2 className="w-4 h-4 text-[#7A2E4D] shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-xs text-[#5E5B66]">{wp.description}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="pt-4 border-t border-[#E4E2E8] max-w-md space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-[#16141C]">
-                <span>Intensidade do papel de parede</span>
-                <span className="font-mono tabular-nums">
-                  {Math.round(wallpaperOpacity * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0.1}
-                max={0.85}
-                step={0.05}
-                value={wallpaperOpacity}
-                onChange={(e) => {
-                  setWallpaperOpacity(Number(e.target.value));
-                  setWallpaperSavedMsg(false);
-                }}
-                className="w-full accent-[#7A2E4D]"
-              />
-            </div>
-          </section>
-        )}
       </main>
+
+      {/* Floating WhatsApp Button to Owner */}
+      <a
+        href={buildWhatsAppUrl(
+          studioConfig.ownerPhone,
+          `Olá Anne Caroline! Estou entrando em contato pela agenda do ${studioConfig.studioName}.`
+        )}
+        target={WHATSAPP_TAB_TARGET}
+        aria-label="Falar com a proprietária no WhatsApp"
+        title="Falar com Anne Caroline no WhatsApp"
+        className="fixed bottom-5 right-5 z-40 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-full shadow-lg border border-emerald-500/30 inline-flex items-center gap-2 transition-transform hover:scale-[1.03]"
+      >
+        <MessageCircle className="w-5 h-5 shrink-0" />
+        <span>WhatsApp</span>
+      </a>
 
       {/* Cancel / Reschedule Confirmation Modal */}
       {cancelTarget && (
