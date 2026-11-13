@@ -1368,7 +1368,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         )}
       </main>
 
-      {/* Floating WhatsApp Button to Owner */}
+      {/* Floating WhatsApp Button to Owner (Logo Only) */}
       <a
         href={buildWhatsAppUrl(
           studioConfig.ownerPhone,
@@ -1377,10 +1377,13 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         target={WHATSAPP_TAB_TARGET}
         aria-label="Falar com a proprietária no WhatsApp"
         title="Falar com Anne Caroline no WhatsApp"
-        className="fixed bottom-5 right-5 z-40 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-full shadow-lg border border-emerald-500/30 inline-flex items-center gap-2 transition-transform hover:scale-[1.03]"
+        className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-600/40"
       >
-        <MessageCircle className="w-5 h-5 shrink-0" />
-        <span>WhatsApp</span>
+        <img
+          src="/assets/aistudio/WhatsApp.svg_374c9d2d.webp"
+          alt="WhatsApp"
+          className="w-14 h-14 object-contain drop-shadow-lg"
+        />
       </a>
 
       {/* Cancel / Reschedule Confirmation Modal */}
