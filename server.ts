@@ -300,7 +300,7 @@ async function startServer() {
 
   app.post('/api/auth/admin-login', (req, res) => {
     const { username, password } = req.body as { username?: string; password?: string };
-    if ((username || '').trim() !== 'AnneCaroline' || password !== 'carol1234') {
+    if ((username || '').trim() !== 'AnneCaroline' || password !== 'carol20') {
       return res.status(401).json({ error: 'Usuário ou senha de administrador inválidos.' });
     }
     const uid = 'owner_anne_caroline';

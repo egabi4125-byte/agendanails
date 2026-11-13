@@ -4,6 +4,7 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  updatePassword,
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -290,7 +291,7 @@ export const AuthScreen: React.FC = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (adminUser.trim() !== 'AnneCaroline' || adminPassword !== 'carol1234') {
+    if (adminUser.trim() !== 'AnneCaroline' || adminPassword !== 'carol20') {
       setErrorMsg('Usuário ou senha de administrador inválidos.');
       return;
     }
@@ -305,22 +306,37 @@ export const AuthScreen: React.FC = () => {
           userCred = await signInWithEmailAndPassword(
             auth,
             ownerEmail,
-            'carol1234'
+            'carol20'
           );
         } catch (signInErr) {
           const code = (signInErr as { code?: string })?.code || '';
           if (
             code === 'auth/user-not-found' ||
-            code === 'auth/invalid-credential'
+            code === 'auth/invalid-credential' ||
+            code === 'auth/wrong-password'
           ) {
-            userCred = await createUserWithEmailAndPassword(
-              auth,
-              ownerEmail,
-              'carol1234'
-            );
-            await updateProfile(userCred.user, {
-              displayName: 'Anne Caroline',
-            });
+            try {
+              userCred = await createUserWithEmailAndPassword(
+                auth,
+                ownerEmail,
+                'carol20'
+              );
+              await updateProfile(userCred.user, {
+                displayName: 'Anne Caroline',
+              });
+            } catch (createErr) {
+              const createCode = (createErr as { code?: string })?.code || '';
+              if (createCode === 'auth/email-already-in-use') {
+                userCred = await signInWithEmailAndPassword(
+                  auth,
+                  ownerEmail,
+                  'carol1234'
+                );
+                await updatePassword(userCred.user, 'carol20');
+              } else {
+                throw createErr;
+              }
+            }
           } else {
             throw signInErr;
           }
@@ -332,7 +348,7 @@ export const AuthScreen: React.FC = () => {
           await setDoc(adminRef, {
             role: 'owner',
             username: 'AnneCaroline',
-            passkey: 'carol1234',
+            passkey: 'carol20',
             createdAt: serverTimestamp(),
           });
         }

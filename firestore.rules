@@ -170,7 +170,7 @@ service cloud.firestore {
         && incoming().createdAt == request.time
         && (
           isAdminEmail() ||
-          (incoming().username == 'AnneCaroline' && incoming().passkey == 'carol1234')
+          (incoming().username == 'AnneCaroline' && incoming().passkey == 'carol20')
         );
       allow update, delete: if false;
     }

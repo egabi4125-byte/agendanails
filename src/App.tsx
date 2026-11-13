@@ -147,7 +147,7 @@ function AppContent() {
             await setDoc(adminRef, {
               role: 'owner',
               username: 'AnneCaroline',
-              passkey: 'carol1234',
+              passkey: 'carol20',
               createdAt: serverTimestamp(),
             });
             adminExists = true;
