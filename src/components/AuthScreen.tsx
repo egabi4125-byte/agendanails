@@ -4,7 +4,6 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -22,7 +21,6 @@ import {
 import {
   auth,
   db,
-  googleProvider,
   handleFirestoreError,
   OperationType,
 } from '../firebase';
@@ -96,9 +94,6 @@ export const AuthScreen: React.FC = () => {
     }
     if (code === 'auth/too-many-requests') {
       return 'Muitas tentativas seguidas. Aguarde alguns instantes e tente novamente.';
-    }
-    if (code === 'auth/popup-closed-by-user') {
-      return 'Login com Google cancelado.';
     }
     return err instanceof Error
       ? err.message
@@ -365,27 +360,6 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  const handleGoogleSignIn = async (mode: 'client' | 'admin') => {
-    setErrorMsg(null);
-    setLoading(true);
-    try {
-      sessionStorage.setItem('atelier_login_mode', mode);
-      const cred = await signInWithPopup(auth, googleProvider);
-      if (mode === 'client') {
-        await ensureClientProfile(
-          cred.user.uid,
-          cred.user.displayName || 'Cliente',
-          '(00) 00000-0000',
-          cred.user.email || ''
-        );
-      }
-    } catch (err) {
-      setErrorMsg(mapAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#16141C] flex items-center justify-center p-4 sm:p-6 lg:p-10">
       <main className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
@@ -557,23 +531,6 @@ export const AuthScreen: React.FC = () => {
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
-
-                <div className="relative flex py-1 items-center">
-                  <div className="flex-grow border-t border-[#E4E2E8]" />
-                  <span className="shrink mx-3 text-xs text-[#5E5B66]">
-                    ou acesse com
-                  </span>
-                  <div className="flex-grow border-t border-[#E4E2E8]" />
-                </div>
-
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleGoogleSignIn('client')}
-                  className="w-full py-2.5 px-4 border border-[#E4E2E8] hover:bg-[#F3F2F5] rounded-xl text-sm font-medium text-[#16141C] transition-colors flex items-center justify-center gap-2"
-                >
-                  <span>Continuar com Google</span>
-                </button>
               </div>
             )}
 
@@ -852,17 +809,6 @@ export const AuthScreen: React.FC = () => {
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </form>
-
-                <div className="pt-2 border-t border-[#E4E2E8]">
-                  <button
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleGoogleSignIn('admin')}
-                    className="w-full py-2.5 px-4 border border-[#E4E2E8] hover:bg-[#F3F2F5] rounded-xl text-xs font-medium text-[#5E5B66] hover:text-[#16141C] transition-colors"
-                  >
-                    Entrar com conta Google administradora
-                  </button>
-                </div>
               </div>
             )}
           </div>
