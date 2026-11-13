@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   collection,
@@ -110,6 +110,31 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [confirmedReceipt, setConfirmedReceipt] = useState<Appointment | null>(null);
+  const autoWhatsappRef = useRef<HTMLAnchorElement | null>(null);
+
+  const buildBookingConfirmationWhatsAppUrl = (appt: Appointment): string => {
+    const msg = [
+      `Olá Anne Caroline! Acabei de confirmar meu agendamento no ${studioConfig.studioName}:`,
+      `• Cliente: ${appt.clientName}`,
+      `• Telefone: ${appt.clientPhone}`,
+      `• Data: ${formatShortDatePtBr(appt.date)} às ${appt.time}`,
+      `• Serviço: ${appt.serviceName} (${formatCurrencyBRL(appt.servicePrice)})`,
+      `• Pagamento após o atendimento: ${appt.paymentMethod}`,
+      `• Local: ${studioConfig.address}`,
+      appt.notes ? `• Obs.: ${appt.notes}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return buildWhatsAppUrl(studioConfig.ownerPhone, msg);
+  };
+
+  const openSingleWhatsAppTab = (url: string) => {
+    const anchor = autoWhatsappRef.current;
+    if (!anchor) return;
+    anchor.href = url;
+    anchor.target = WHATSAPP_TAB_TARGET;
+    anchor.click();
+  };
 
   // Cancel / Reschedule Modal State
   const [cancelTarget, setCancelTarget] = useState<{
@@ -307,6 +332,9 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
         setConfirmedReceipt(res.appointment);
         setSelectedTime(null);
         setNotes('');
+        openSingleWhatsAppTab(
+          buildBookingConfirmationWhatsAppUrl(res.appointment)
+        );
       } catch (err) {
         setBookingError(
           err instanceof Error
@@ -355,12 +383,16 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
       });
       await batch.commit();
 
-      setConfirmedReceipt({
+      const confirmedAppt: Appointment = {
         ...newAppointmentPayload,
         id: apptRef.id,
-      });
+      };
+      setConfirmedReceipt(confirmedAppt);
       setSelectedTime(null);
       setNotes('');
+      openSingleWhatsAppTab(
+        buildBookingConfirmationWhatsAppUrl(confirmedAppt)
+      );
     } catch (err) {
       try {
         handleFirestoreError(err, OperationType.WRITE, `appointments/${apptRef.id}`);
@@ -536,6 +568,18 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
   return (
     <div className="min-h-screen relative text-[#16141C] flex flex-col bg-[#FAFAFA]">
+      {/* Hidden anchor to auto-trigger WhatsApp in a single reused tab without window.open */}
+      <a
+        ref={autoWhatsappRef}
+        href="https://wa.me/"
+        target={WHATSAPP_TAB_TARGET}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+      >
+        WhatsApp
+      </a>
+
       {/* Client-Only Personalized Wallpaper Backdrop */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         {activeWallpaper.imageUrl && !wallpaperImgErrors[activeWallpaper.id] ? (
@@ -688,7 +732,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
                         Horário confirmado automaticamente
                       </h2>
                       <p className="text-sm text-[#5E5B66] mt-0.5">
-                        Sua reserva foi salva no sistema. Envie o comprovante de confirmação pelo canal de sua preferência.
+                        Sua reserva foi salva no sistema e o WhatsApp foi acionado com a mensagem de confirmação. Caso o navegador bloqueie a abertura automática, use o botão abaixo.
                       </p>
                     </div>
                   </div>
@@ -727,10 +771,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
 
                 <div className="flex flex-wrap items-center gap-3">
                   <a
-                    href={buildWhatsAppUrl(
-                      studioConfig.ownerPhone,
-                      `Olá Anne Caroline! Acabei de confirmar meu agendamento:\n• Cliente: ${confirmedReceipt.clientName}\n• Data: ${formatShortDatePtBr(confirmedReceipt.date)} às ${confirmedReceipt.time}\n• Serviço: ${confirmedReceipt.serviceName}\n• Pagamento após o atendimento: ${confirmedReceipt.paymentMethod}`
-                    )}
+                    href={buildBookingConfirmationWhatsAppUrl(confirmedReceipt)}
                     target={WHATSAPP_TAB_TARGET}
                     className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0"
                   >
