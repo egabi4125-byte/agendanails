@@ -115,7 +115,6 @@ export const DEFAULT_WORKING_HOURS = [
 ];
 
 export const DEFAULT_SERVICES: NailService[] = [
-  { id: 'fibra_vidro', name: 'Alongamento em Fibra de Vidro', durationMin: 120, price: 180 },
   { id: 'banho_gel', name: 'Banho de Gel Natural', durationMin: 90, price: 120 },
   { id: 'manutencao', name: 'Manutenção de Alongamento', durationMin: 90, price: 110 },
   { id: 'esmaltacao_gel', name: 'Esmaltação em Gel', durationMin: 60, price: 85 },

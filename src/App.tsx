@@ -189,9 +189,19 @@ function AppContent() {
         finances: FinanceEntry[];
         clientProfile: ClientProfile | null;
       }>('/api/studio/state');
-      setStudioConfig({
+      const rawCfg = {
         ...DEFAULT_STUDIO_CONFIG,
         ...(data.studioConfig || {}),
+      };
+      const cleanServices = (rawCfg.services || []).filter(
+        (s) => s.id !== 'fibra_vidro' && !/fibra\s+de\s+vidro/i.test(s.name)
+      );
+      setStudioConfig({
+        ...rawCfg,
+        services:
+          cleanServices.length > 0
+            ? cleanServices
+            : DEFAULT_STUDIO_CONFIG.services,
       });
       setClients(data.clients || []);
       setAppointments(data.appointments || []);
@@ -226,9 +236,19 @@ function AppContent() {
         doc(db, 'studio', 'config'),
         (snap) => {
           if (snap.exists()) {
-            setStudioConfig({
+            const rawCfg = {
               ...DEFAULT_STUDIO_CONFIG,
               ...(snap.data() as StudioConfig),
+            };
+            const cleanServices = (rawCfg.services || []).filter(
+              (s) => s.id !== 'fibra_vidro' && !/fibra\s+de\s+vidro/i.test(s.name)
+            );
+            setStudioConfig({
+              ...rawCfg,
+              services:
+                cleanServices.length > 0
+                  ? cleanServices
+                  : DEFAULT_STUDIO_CONFIG.services,
             });
           } else if (isOwner) {
             setDoc(doc(db, 'studio', 'config'), {

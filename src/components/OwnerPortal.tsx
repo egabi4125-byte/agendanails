@@ -97,7 +97,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
   const [formClientPhone, setFormClientPhone] = useState('');
   const [formClientEmail, setFormClientEmail] = useState('');
   const [formServiceId, setFormServiceId] = useState(
-    studioConfig.services[0]?.id || 'fibra_vidro'
+    studioConfig.services[0]?.id || 'banho_gel'
   );
   const [formDate, setFormDate] = useState(todayKey);
   const [formTime, setFormTime] = useState(studioConfig.workingHours[0] || '08:30');
@@ -257,7 +257,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
     setFormClientName('');
     setFormClientPhone('');
     setFormClientEmail('');
-    setFormServiceId(studioConfig.services[0]?.id || 'fibra_vidro');
+    setFormServiceId(studioConfig.services[0]?.id || 'banho_gel');
     setFormDate(dateFilter || todayKey);
     setFormTime(studioConfig.workingHours[0] || '08:30');
     setFormPaymentMethod('Pix');
@@ -1789,7 +1789,7 @@ export const OwnerPortal: React.FC<OwnerPortalProps> = ({
                       required
                       value={finDesc}
                       onChange={(e) => setFinDesc(e.target.value)}
-                      placeholder="Ex: Alongamento Fibra de Vidro"
+                      placeholder="Ex: Banho de Gel Natural"
                       className="w-full px-3.5 py-2 text-sm border border-[#E4E2E8] rounded-xl"
                     />
                   </div>

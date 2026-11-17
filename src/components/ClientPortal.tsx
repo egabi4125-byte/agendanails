@@ -99,7 +99,7 @@ export const ClientPortal: React.FC<ClientPortalProps> = ({
   const [phone, setPhone] = useState(clientProfile?.phone === '(00) 00000-0000' ? '' : clientProfile?.phone || '');
   const [email, setEmail] = useState(clientProfile?.email || '');
   const [selectedServiceId, setSelectedServiceId] = useState(
-    studioConfig.services[0]?.id || 'fibra_vidro'
+    studioConfig.services[0]?.id || 'banho_gel'
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Pix');
   const [notes, setNotes] = useState('');

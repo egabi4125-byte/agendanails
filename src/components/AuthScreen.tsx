@@ -454,7 +454,7 @@ export const AuthScreen: React.FC = () => {
               <div>
                 <p className="text-sm font-semibold text-white">byannenails</p>
                 <p className="text-xs text-white/75">
-                  Fibra de Vidro · Banho de Gel · Esmaltação
+                  Banho de Gel · Esmaltação
                 </p>
               </div>
             </div>

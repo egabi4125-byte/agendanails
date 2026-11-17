@@ -131,7 +131,6 @@ const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   pixCity: 'SAO PAULO',
   workingHours: ['08:30', '10:00', '11:30', '13:30', '15:00', '16:30', '18:00'],
   services: [
-    { id: 'fibra_vidro', name: 'Alongamento em Fibra de Vidro', durationMin: 120, price: 180 },
     { id: 'banho_gel', name: 'Banho de Gel Natural', durationMin: 90, price: 120 },
     { id: 'manutencao', name: 'Manutenção de Alongamento', durationMin: 90, price: 110 },
     { id: 'esmaltacao_gel', name: 'Esmaltação em Gel', durationMin: 60, price: 85 },
